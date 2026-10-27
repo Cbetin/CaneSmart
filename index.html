@@ -4,25 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#101b17" />
-    <meta name="description" content="Explora CaneSmart: una experiencia 3D interactiva con escenarios de agarre, marcha y respuesta ante una caída. Todos los datos son simulados." />
-    <title>CaneSmart — experiencia 3D</title>
+    <meta name="description" content="Recorre CaneSmart en una experiencia 3D jugable. Los valores de esfuerzo y apoyo son simulados y no son una evaluación médica." />
+    <title>CaneSmart — Ruta de confianza</title>
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <a class="brand" href="#inicio" aria-label="CaneSmart, inicio">
           <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 32 32" fill="none">
-              <path d="M20.7 4.2c-1.4 0-2.4.9-2.4 2.2v16.2c0 2.8-1.9 4.6-4.5 4.6-2.4 0-4.1-1.6-4.1-3.8s1.5-3.7 3.8-3.7h1.2v-4.2h-1.5c-4.7 0-8 3.3-8 7.9 0 4.5 3.5 7.8 8.5 7.8 5.2 0 8.8-3.4 8.8-8.5V9.6h4.1V5.4h-4.1v-1.2h-1.8Z" fill="currentColor" transform="translate(0 -1) scale(.96)" />
-              <circle cx="22.1" cy="6.8" r="1.6" fill="#D9EFDF" />
-            </svg>
+            <svg viewBox="0 0 32 32" fill="none"><path d="M20.7 4.2c-1.4 0-2.4.9-2.4 2.2v16.2c0 2.8-1.9 4.6-4.5 4.6-2.4 0-4.1-1.6-4.1-3.8s1.5-3.7 3.8-3.7h1.2v-4.2h-1.5c-4.7 0-8 3.3-8 7.9 0 4.5 3.5 7.8 8.5 7.8 5.2 0 8.8-3.4 8.8-8.5V9.6h4.1V5.4h-4.1v-1.2h-1.8Z" fill="currentColor" transform="translate(0 -1) scale(.96)"/><circle cx="22.1" cy="6.8" r="1.6" fill="#D9EFDF"/></svg>
           </span>
           <span class="brand-word">Cane<span>Smart</span></span>
           <span class="brand-divider" aria-hidden="true"></span>
-          <span class="brand-context">Laboratorio de producto</span>
+          <span class="brand-context">Ruta de confianza</span>
         </a>
         <div class="topbar-right">
-          <span class="topbar-note"><span class="topbar-dot"></span>Prototipo interactivo</span>
+          <span class="topbar-note"><span class="topbar-dot"></span>Juego 3D · 3 tramos</span>
           <span class="topbar-separator" aria-hidden="true"></span>
           <span class="sim-badge"><span class="sim-badge-dot"></span>SIMULACIÓN</span>
         </div>
@@ -31,50 +28,35 @@
       <main id="inicio">
         <section class="intro" aria-labelledby="page-title">
           <div class="intro-copy">
-            <div class="eyebrow"><span class="eyebrow-line"></span>TECNOLOGÍA QUE ACOMPAÑA</div>
-            <h1 id="page-title">Un apoyo inteligente,<br /><span>paso a paso.</span></h1>
-            <p>Explora el bastón CaneSmart y descubre cómo una interacción podría convertirse en una alerta oportuna.</p>
+            <div class="eyebrow"><span class="eyebrow-line"></span>RECORRIDO INTERACTIVO · 3D</div>
+            <h1 id="page-title">Avanza a tu <span>propio ritmo.</span></h1>
+            <p>Toma el bastón, mantén un apoyo moderado, esquiva los obstáculos y cruza las zonas de luz hasta llegar a la meta.</p>
           </div>
-          <div class="intro-side">
-            <span class="intro-index">EXPERIENCIA 3D <b>01 / 01</b></span>
-            <span class="intro-seal" aria-hidden="true">
-              <svg viewBox="0 0 52 52" fill="none">
-                <circle cx="26" cy="26" r="24.5" stroke="currentColor" stroke-opacity=".18" />
-                <path d="M26 11v30M11 26h30M15.4 15.4l21.2 21.2m0-21.2L15.4 36.6" stroke="currentColor" stroke-opacity=".42" stroke-width=".7" />
-                <circle cx="26" cy="26" r="4" fill="currentColor" />
-                <circle cx="26" cy="11" r="1.8" fill="currentColor" />
-                <circle cx="41" cy="26" r="1.8" fill="currentColor" />
-                <circle cx="26" cy="41" r="1.8" fill="currentColor" />
-                <circle cx="11" cy="26" r="1.8" fill="currentColor" />
-              </svg>
-            </span>
+          <div class="route-summary" aria-label="Resumen del recorrido">
+            <span class="summary-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 18.5c3.5 0 2-13 6-13s2.5 13 8 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="2.4 3"/><circle cx="5" cy="18.5" r="2" fill="currentColor"/><circle cx="19" cy="18.5" r="2" fill="currentColor"/><path d="M11 5.5h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></span>
+            <span><strong>~ 1 min</strong><small>7 zonas objetivo · 7 obstáculos</small></span>
           </div>
         </section>
 
-        <section class="workspace" aria-label="Experiencia interactiva de CaneSmart">
+        <section class="workspace" aria-label="Juego CaneSmart">
           <div class="viewer-shell" id="viewer-shell">
-            <div class="scene-canvas" id="scene" aria-label="Visor 3D interactivo del bastón CaneSmart"></div>
+            <div class="scene-canvas" id="scene" aria-label="Recorrido 3D de CaneSmart"></div>
             <div class="viewer-vignette" aria-hidden="true"></div>
 
             <div class="viewer-topline">
               <div class="viewer-id">
-                <span class="viewer-id-icon" aria-hidden="true">
-                  <svg viewBox="0 0 18 18" fill="none"><path d="M9 2.1v13.8M5.1 4.2l7.8 9.6M12.9 4.2l-7.8 9.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="9" cy="9" r="2" fill="currentColor"/></svg>
-                </span>
-                <span><strong>VISOR DE PRODUCTO</strong><small id="model-status">Preparando Baston_2.obj…</small></span>
+                <span class="viewer-id-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none"><path d="M9 2.1v13.8M5.1 4.2l7.8 9.6M12.9 4.2l-7.8 9.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="9" cy="9" r="2" fill="currentColor"/></svg></span>
+                <span><strong>RUTA CANESMART</strong><small id="model-status">Preparando Baston_2.obj…</small></span>
               </div>
-              <div class="viewer-live"><span class="live-ring"></span><span id="mode-status">VISUALIZACIÓN LISTA</span></div>
+              <div class="viewer-live"><span class="live-ring" id="state-dot"></span><span id="viewer-status">INSTRUCCIONES · 20 S</span></div>
             </div>
 
-            <div class="viewer-side-note" aria-hidden="true">
-              <span class="vertical-rule"></span>
-              <span>DISEÑO<br />EN MOVIMIENTO</span>
-            </div>
+            <div class="route-markers" aria-hidden="true"><span>INICIO</span><i></i><span>META</span></div>
 
             <div class="viewer-bottomline">
               <div class="viewer-caption">
-                <span class="caption-kicker" id="caption-kicker">01 / INSPECCIÓN</span>
-                <span class="caption-title" id="caption-title">Baston_2.obj <i>·</i> vista libre</span>
+                <span class="caption-kicker" id="canvas-objective-label">OBJETIVO DEL TRAMO</span>
+                <span class="caption-title" id="canvas-objective">Toma el bastón para comenzar</span>
               </div>
               <div class="viewer-actions">
                 <div class="xr-wrap">
@@ -82,13 +64,16 @@
                     <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 6.3h14a1.8 1.8 0 0 1 1.8 1.8v4.1a1.8 1.8 0 0 1-2.4 1.7l-2.8-1a5.6 5.6 0 0 0-3.8 0l-2.8 1A1.8 1.8 0 0 1 4.8 12V8.1A1.8 1.8 0 0 1 3 6.3Z" stroke="currentColor" stroke-width="1.4"/><path d="M6 8.5v3M4.5 10h3M13.4 9.4h.01M15.7 10.8h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                     <span id="xr-button-label">Comprobando WebXR</span>
                   </button>
-                  <span class="xr-tooltip" id="xr-support-note">Para Meta Quest, abre esta página en el navegador del visor.</span>
+                  <span class="xr-tooltip" id="xr-support-note">Meta Quest · pulsa gatillo o grip para sujetar el bastón.</span>
                 </div>
-                <button class="take-button" id="take-button" type="button">
+                <button class="take-button" id="take-button" type="button" disabled>
                   <svg class="take-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6.1 10.2V5.7a1.3 1.3 0 0 1 2.6 0v3.1-4.4a1.3 1.3 0 0 1 2.6 0v4-3.1a1.3 1.3 0 0 1 2.6 0v4-1.1a1.3 1.3 0 0 1 2.6 0v5.2c0 2.7-1.7 4.5-4.4 4.5h-1.8c-1.5 0-2.6-.5-3.5-1.6l-2.6-3.2a1.5 1.5 0 0 1 2.2-2l1.5 1.3" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  <span id="take-button-label">Tomar bastón</span>
+                  <span id="take-button-label">Tomar bastón</span><kbd>E</kbd>
                 </button>
-                <button class="reset-view-button" id="reset-button" type="button" aria-label="Reiniciar escena" title="Reiniciar escena (R)">
+                <button class="pause-button" id="pause-button" type="button" disabled aria-label="Pausar recorrido">
+                  <svg viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M6.5 4.5v9M11.5 4.5v9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                </button>
+                <button class="reset-view-button" id="reset-button" type="button" aria-label="Reiniciar recorrido (R)" title="Reiniciar recorrido (R)">
                   <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3.3 8a6.8 6.8 0 1 1 .4 4.7M3.3 3.7V8h4.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
               </div>
@@ -96,7 +81,7 @@
 
             <div class="loading-card" id="loading-card" role="status" aria-live="polite">
               <span class="loading-spinner" aria-hidden="true"></span>
-              <span class="loading-copy"><strong>Cargando el modelo 3D</strong><small id="loading-message">Baston_2.obj · preparando geometría</small></span>
+              <span class="loading-copy"><strong>Cargando el bastón 3D</strong><small id="loading-message">Baston_2.obj · preparando geometría</small></span>
               <span class="loading-percent" id="loading-percent">—</span>
             </div>
             <div class="webgl-error" id="webgl-error" hidden>
@@ -104,101 +89,149 @@
               <strong>El visor 3D no está disponible</strong>
               <span>Prueba con un navegador actualizado y activa la aceleración gráfica.</span>
             </div>
+
+            <div class="screen-overlay" id="instructions-screen" role="dialog" aria-modal="true" aria-labelledby="instructions-title">
+              <div class="intro-card">
+                <div class="intro-card-top"><span class="game-kicker"><span></span>ANTES DE EMPEZAR</span><span class="read-time">LECTURA · 20 S</span></div>
+                <h2 id="instructions-title">Una ruta. <em>Tu ritmo.</em></h2>
+                <p class="instructions-lead">Completa tres tramos hasta la meta. Todas las lecturas son simulaciones del juego, no mediciones.</p>
+                <div class="quick-steps">
+                  <div><b>01</b><span><strong>Toma el bastón</strong><small>Sin agarrarlo, el recorrido no avanza.</small></span></div>
+                  <div><b>02</b><span><strong>Busca el equilibrio</strong><small>Apoyo moderado: avanzas mejor; exceso: cuesta más.</small></span></div>
+                  <div><b>03</b><span><strong>Esquiva y pisa luz</strong><small>Evita conos y completa cada zona brillante.</small></span></div>
+                </div>
+                <div class="control-keys">
+                  <div><span class="key-icon">⌨</span><span><strong>Computador</strong><small>WASD / flechas · E o botón para agarrar · Shift para correr · P pausa · R reinicia</small></span></div>
+                  <div><span class="key-icon quest-icon">◉</span><span><strong>Meta Quest</strong><small>Joystick izquierdo para desplazarte · L3 acelera · gatillo toma/suelta · grip izquierdo ajusta apoyo</small></span></div>
+                </div>
+                <button class="start-game-button" id="start-game" type="button">Entendido · preparar recorrido <span aria-hidden="true">→</span></button>
+                <p class="instruction-footnote">Después, toma el bastón con el gatillo en Quest o con E / el botón en computador.</p>
+              </div>
+            </div>
+
+            <div class="screen-overlay" id="pause-screen" role="dialog" aria-modal="true" aria-labelledby="pause-title" hidden>
+              <div class="pause-card">
+                <span class="game-kicker"><span></span>RECORRIDO EN PAUSA</span>
+                <h2 id="pause-title">Tómate un respiro.</h2>
+                <p>El tiempo y la estamina quedan en pausa.</p>
+                <div class="pause-actions"><button class="start-game-button" id="resume-game" type="button">Continuar <span aria-hidden="true">→</span></button><button class="quiet-button" id="reset-from-pause" type="button">Reiniciar recorrido</button></div>
+                <small>Quest: pulsa A / X para continuar.</small>
+              </div>
+            </div>
+
+            <div class="screen-overlay" id="finish-screen" role="dialog" aria-modal="true" aria-labelledby="finish-title" hidden>
+              <div class="finish-card">
+                <div class="finish-medal" aria-hidden="true"><svg viewBox="0 0 44 44" fill="none"><circle cx="22" cy="22" r="19" stroke="currentColor" stroke-opacity=".28"/><path d="m13 22 6 6 12-13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                <span class="game-kicker"><span></span>RECORRIDO COMPLETADO</span>
+                <h2 id="finish-title">Llegaste a la meta.</h2>
+                <p>Buen ritmo. Aquí tienes el resumen de esta partida.</p>
+                <div class="finish-stats">
+                  <div><small>TIEMPO</small><strong id="final-time">00:00</strong></div>
+                  <div><small>PUNTOS</small><strong id="final-score">0</strong></div>
+                  <div><small>OBSTÁCULOS EVITADOS</small><strong id="final-obstacles">0 / 7</strong></div>
+                  <div><small>ZONAS COMPLETADAS</small><strong id="final-zones">0 / 7</strong></div>
+                </div>
+                <button class="start-game-button" id="replay-game" type="button">Jugar de nuevo <span aria-hidden="true">↻</span></button>
+                <small class="finish-disclaimer">Las cifras de esfuerzo mostradas durante el juego fueron simuladas; no son signos vitales ni una evaluación médica.</small>
+              </div>
+            </div>
+
+            <div class="game-toast" id="game-toast" role="status" aria-live="polite" hidden></div>
+            <div class="comfort-vignette" id="comfort-vignette" aria-hidden="true"></div>
           </div>
 
-          <aside class="control-panel" aria-label="Controles y lecturas simuladas">
+          <aside class="game-panel" aria-label="Objetivos y controles del recorrido">
             <div class="panel-heading">
-              <div>
-                <span class="section-kicker">PRUEBA UN ESCENARIO</span>
-                <h2>¿Qué quieres explorar?</h2>
-              </div>
-              <span class="panel-status" id="panel-status"><span></span>LISTO</span>
+              <div><span class="section-kicker">TU RECORRIDO</span><h2 id="stage-title">Agarre y equilibrio</h2></div>
+              <span class="panel-status" id="panel-status"><span></span><span id="panel-status-text">PREPARA</span></span>
             </div>
 
-            <div class="scenario-grid" role="group" aria-label="Escenarios del bastón">
-              <button class="scenario-card is-active" type="button" data-mode="inspect" aria-pressed="true">
-                <span class="scenario-icon icon-inspect" aria-hidden="true"><svg viewBox="0 0 22 22" fill="none"><circle cx="9.7" cy="9.7" r="5.7" stroke="currentColor" stroke-width="1.5"/><path d="m14 14 4.4 4.4M9.7 7v5.4M7 9.7h5.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
-                <span class="scenario-copy"><strong>Inspeccionar</strong><small>Rota y acerca</small></span>
-                <kbd>1</kbd>
-              </button>
-              <button class="scenario-card" type="button" data-mode="grip" aria-pressed="false">
-                <span class="scenario-icon icon-grip" aria-hidden="true"><svg viewBox="0 0 22 22" fill="none"><path d="M7.5 11V6.4a1.3 1.3 0 0 1 2.6 0v3.1-4.2a1.3 1.3 0 0 1 2.6 0v4-3a1.3 1.3 0 0 1 2.6 0v4-1a1.3 1.3 0 0 1 2.6 0v4.3c0 2.5-1.5 4-4 4h-1.5c-1.3 0-2.3-.5-3.1-1.5l-2.3-2.7a1.4 1.4 0 0 1 2-2l1.1 1" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                <span class="scenario-copy"><strong>Probar agarre</strong><small>Presión de contacto</small></span>
-                <kbd>2</kbd>
-              </button>
-              <button class="scenario-card" type="button" data-mode="walk" aria-pressed="false">
-                <span class="scenario-icon icon-walk" aria-hidden="true"><svg viewBox="0 0 22 22" fill="none"><path d="m13.5 3.5-3.2 5.1 3.1 2.3-2.8 3.9M10.3 8.6l-3.9 1.3-2 3.6M11.2 14.8l2.4 3.3M15.3 8.9l3.1 1.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.1" cy="4.1" r="1.5" stroke="currentColor" stroke-width="1.35"/></svg></span>
-                <span class="scenario-copy"><strong>Simular marcha</strong><small>Ritmo y movimiento</small></span>
-                <kbd>3</kbd>
-              </button>
-              <button class="scenario-card scenario-fall" type="button" data-mode="fall" aria-pressed="false">
-                <span class="scenario-icon icon-fall" aria-hidden="true"><svg viewBox="0 0 22 22" fill="none"><path d="m13.1 4.1-2.8 4.2 2.3 2-2.4 3.2-3.2 1.1M10.3 8.3l-3.5-.1-2.1 2.2M12.6 10.3l3.2 1.6 2.2-.5M9.8 14.1l1.9 3M15.6 4.4h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="15.8" cy="4.7" r="1.5" stroke="currentColor" stroke-width="1.35"/></svg></span>
-                <span class="scenario-copy"><strong>Simular caída</strong><small>Respuesta de alerta</small></span>
-                <kbd>4</kbd>
-              </button>
-            </div>
-
-            <div class="panel-divider"></div>
-
-            <div class="sensor-heading">
-              <div><span class="section-kicker">LECTURAS DEL PROTOTIPO</span><h3>Sensores</h3></div>
-              <span class="simulated-tag"><span></span>SIMULADAS</span>
-            </div>
-            <div class="sensor-list" aria-live="polite">
-              <div class="sensor-row">
-                <span class="sensor-symbol pressure-symbol" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none"><path d="M3 13.8a6 6 0 1 1 12 0M9 9l2.4-2.4M5.4 13.8h7.2" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/><circle cx="9" cy="9" r="1" fill="currentColor"/></svg></span>
-                <span class="sensor-label">Presión del mango</span>
-                <strong class="sensor-value" id="pressure-value">0<span>%</span></strong>
-                <span class="sensor-meter"><i id="pressure-meter"></i></span>
-              </div>
-              <div class="sensor-row">
-                <span class="sensor-symbol cadence-symbol" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none"><path d="M3 12.7h2.3l1.5-4.3 2.2 6 1.7-4.5 1 2.8H15" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                <span class="sensor-label">Ritmo de marcha</span>
-                <strong class="sensor-value" id="cadence-value">0<span>ppm</span></strong>
-                <span class="sensor-meter"><i id="cadence-meter"></i></span>
-              </div>
-              <div class="sensor-row">
-                <span class="sensor-symbol impact-symbol" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none"><path d="m10.1 2.7-5 7h3.6l-.8 5.6 5-7H9.3l.8-5.6Z" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                <span class="sensor-label">Acelerómetro · IMU</span>
-                <strong class="sensor-value" id="impact-value">0.00<span>g</span></strong>
-                <span class="sensor-meter"><i id="impact-meter"></i></span>
+            <div class="journey-block">
+              <div class="journey-meta"><span id="stage-number">TRAMO 01 / 03</span><strong><span id="journey-progress-text">0</span>%</strong></div>
+              <div class="journey-bar"><i id="journey-progress-bar"></i></div>
+              <p class="stage-goal" id="stage-goal">Toma el bastón y pisa las dos zonas iluminadas.</p>
+              <div class="stage-progress-meta"><span>Objetivo del tramo</span><b id="stage-progress-text">0 / 2 zonas</b></div>
+              <div class="stage-progress-bar"><i id="stage-progress-bar"></i></div>
+              <div class="stage-steps" aria-label="Progreso de tramos">
+                <div class="stage-step is-current" data-stage="0"><span>01</span><small>Agarre</small></div>
+                <i></i>
+                <div class="stage-step" data-stage="1"><span>02</span><small>Esquiva</small></div>
+                <i></i>
+                <div class="stage-step" data-stage="2"><span>03</span><small>Meta</small></div>
               </div>
             </div>
 
-            <div class="alert-card" id="alert-card" aria-live="polite">
+            <div class="score-grid">
+              <div class="score-tile"><span class="tile-label">PUNTOS</span><strong id="score-value">0</strong><small>+25 por zona · +8 por obstáculo evitado</small></div>
+              <div class="score-tile"><span class="tile-label">TIEMPO</span><strong id="timer-value">00:00</strong><small>Ritmo moderado recomendado</small></div>
+              <div class="mini-stat"><span class="mini-stat-icon target-icon">◎</span><span><strong id="zones-value">0 / 7</strong><small>Zonas objetivo</small></span></div>
+              <div class="mini-stat"><span class="mini-stat-icon obstacle-icon">⌁</span><span><strong id="obstacles-value">0 / 7</strong><small>Obstáculos evitados</small></span></div>
+            </div>
+
+            <section class="sim-card support-card" aria-labelledby="support-title">
+              <div class="sim-card-heading"><div><span class="section-kicker">CONTROL DEL JUEGO</span><h3 id="support-title">Fuerza de apoyo</h3></div><span class="simulated-tag"><span></span>SIMULADO</span></div>
+              <div class="support-reading"><strong><span id="support-value">45</span><small>%</small></strong><span class="support-status" id="support-status">Apoyo moderado</span></div>
+              <div class="support-meter"><i id="support-meter"></i><span></span></div>
+              <label class="sr-only" for="support-slider">Fuerza de apoyo simulada</label>
+              <input id="support-slider" class="support-slider" type="range" min="0" max="100" value="45" aria-describedby="support-hint" />
+              <div class="support-controls"><button id="support-down" type="button" aria-label="Reducir apoyo simulado">−</button><span id="support-hint">Un apoyo moderado mejora el equilibrio. El exceso reduce tu velocidad y consume estamina.</span><button id="support-up" type="button" aria-label="Aumentar apoyo simulado">+</button></div>
+            </section>
+
+            <section class="sim-card effort-card" aria-labelledby="effort-title">
+              <div class="sim-card-heading"><div><span class="section-kicker">PERSONAJE VIRTUAL</span><h3 id="effort-title">Esfuerzo</h3></div><span class="simulated-tag"><span></span>SIMULADO</span></div>
+              <div class="effort-vitals">
+                <div class="effort-vital"><span class="vital-icon heart-icon" aria-hidden="true">♥</span><span><strong id="heart-rate">73</strong><small>latidos/min</small></span></div>
+                <div class="effort-vital"><span class="vital-icon breath-icon" aria-hidden="true">≈</span><span><strong id="breathing-rate">13</strong><small>respiraciones/min</small></span></div>
+              </div>
+              <div class="stamina-heading"><span>Estamina</span><strong><span id="stamina-value">100</span><small>%</small></strong></div>
+              <div class="stamina-bar"><i id="stamina-bar"></i></div>
+              <p class="medical-note">Valores simulados del personaje; no son signos vitales medidos ni evaluación médica.</p>
+            </section>
+
+            <section class="alert-demo-card" id="alert-demo-card" aria-labelledby="alert-title">
               <div class="alert-card-top">
-                <span class="alert-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M10 2.8a5.5 5.5 0 0 0-5.5 5.5c0 3.8-1.6 4.2-1.6 5.3h14.2c0-1.1-1.6-1.5-1.6-5.3A5.5 5.5 0 0 0 10 2.8ZM8 16a2.2 2.2 0 0 0 4 0" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                <span class="alert-status" id="alert-status">RUTA DE RESPUESTA</span>
-                <span class="alert-pulse" id="alert-pulse"></span>
+                <span class="section-kicker">PRUEBA CONCEPTUAL</span>
+                <span class="alert-status" id="alert-status" aria-live="polite">DEMO · SIMULADA</span>
               </div>
-              <h3 id="alert-title">Si detecta una caída…</h3>
-              <p id="alert-description">El prototipo mostraría una alerta para un contacto de confianza. Prueba el escenario para ver el flujo.</p>
+              <h3 id="alert-title">Respuesta ante una caída</h3>
+              <p id="alert-description">Muestra una caída del personaje y una opción de respuesta. La prueba es local: no envía alertas ni se comunica con nadie.</p>
               <div class="alert-meta" id="alert-meta">Sin llamadas, mensajes ni ubicación real.</div>
+              <button class="alert-primary" id="simulate-fall" type="button">Simular caída <span aria-hidden="true">→</span></button>
               <div class="alert-actions" id="alert-actions" hidden>
                 <button class="alert-primary" id="reply-contact" type="button">Simular respuesta del contacto</button>
                 <button class="alert-secondary" id="resolve-alert" type="button">Estoy bien · cerrar prueba</button>
               </div>
-            </div>
+            </section>
+
+            <section class="computer-controls" aria-label="Controles para computador">
+              <div class="control-heading"><span class="section-kicker">CONTROLES · COMPUTADOR</span><span class="control-mouse-note">teclado o ratón</span></div>
+              <div class="dpad" role="group" aria-label="Movimiento del personaje">
+                <button class="dpad-button dpad-up" data-move="forward" type="button" aria-label="Avanzar">↑</button>
+                <button class="dpad-button dpad-left" data-move="left" type="button" aria-label="Mover a la izquierda">←</button>
+                <span class="dpad-center" aria-hidden="true">●</span>
+                <button class="dpad-button dpad-right" data-move="right" type="button" aria-label="Mover a la derecha">→</button>
+                <button class="dpad-button dpad-down" data-move="back" type="button" aria-label="Retroceder">↓</button>
+              </div>
+              <button class="sprint-button" id="sprint-button" type="button"><span aria-hidden="true">»</span> Mantén para caminar deprisa <kbd>Shift</kbd></button>
+            </section>
+
+            <label class="comfort-card" for="comfort-toggle">
+              <span class="comfort-mark" aria-hidden="true">◉</span>
+              <span><strong>Desplazamiento cómodo</strong><small>Menos velocidad y viñeta suave en VR.</small></span>
+              <input id="comfort-toggle" type="checkbox" checked />
+              <i class="toggle-track" aria-hidden="true"><b></b></i>
+            </label>
           </aside>
         </section>
 
-        <section class="guide-strip" aria-label="Controles y nota de simulación">
-          <div class="guide-item guide-desktop">
-            <span class="guide-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M5.5 7.5a4.5 4.5 0 0 1 9 0v3a4.5 4.5 0 0 1-9 0v-3Z" stroke="currentColor" stroke-width="1.35"/><path d="M10 5.5v3M3.1 10.1a6.9 6.9 0 0 0 13.8 0" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/></svg></span>
-            <span><strong>En computador</strong><small>Arrastra para girar · rueda para acercar · teclas 1–4 para cambiar de escenario</small></span>
-          </div>
+        <section class="guide-strip" aria-label="Ayuda rápida y nota de seguridad">
+          <div class="guide-item"><span class="guide-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M3.5 10h13M10 3.5v13M5.4 5.4l9.2 9.2m0-9.2-9.2 9.2" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/></svg></span><span><strong>En computador</strong><small>WASD / flechas para moverte · Shift para correr · [ y ] para ajustar apoyo.</small></span></div>
           <div class="guide-divider" aria-hidden="true"></div>
-          <div class="guide-item guide-xr">
-            <span class="guide-icon xr-guide-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M3.2 6.6h13.6c.8 0 1.4.6 1.4 1.4v4a1.5 1.5 0 0 1-2 1.4l-2.5-.9a6 6 0 0 0-4 0l-2.5.9a1.5 1.5 0 0 1-2-1.4V8c0-.8.6-1.4 1.4-1.4Z" stroke="currentColor" stroke-width="1.3"/><path d="M6 8.5v3M4.5 10h3M13 9.5h.01M15.4 10.7h.01" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/></svg></span>
-            <span><strong>Modo inmersivo</strong><small id="xr-guide-text">Si WebXR está disponible, entra desde un navegador compatible con Meta Quest.</small></span>
-          </div>
-          <div class="guide-disclaimer"><span class="disclaimer-mark">i</span><span>Demo conceptual: sensores, datos y alertas <b>son simulados</b>.</span></div>
+          <div class="guide-item guide-xr"><span class="guide-icon xr-guide-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M3.2 6.6h13.6c.8 0 1.4.6 1.4 1.4v4a1.5 1.5 0 0 1-2 1.4l-2.5-.9a6 6 0 0 0-4 0l-2.5.9a1.5 1.5 0 0 1-2-1.4V8c0-.8.6-1.4 1.4-1.4Z" stroke="currentColor" stroke-width="1.3"/><path d="M6 8.5v3M4.5 10h3M13 9.5h.01M15.4 10.7h.01" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/></svg></span><span><strong>En Meta Quest</strong><small id="xr-guide-text">Joystick izquierdo para moverte · L3 acelera · gatillo sujeta · grip izquierdo ajusta apoyo.</small></span></div>
+          <div class="guide-disclaimer"><span class="disclaimer-mark">i</span><span>Apoyo, latidos, respiración y estamina <b>son simulados</b>.</span></div>
         </section>
 
-        <footer class="page-footer">
-          <span>CANESMART <i>·</i> Tecnología para caminar con más confianza</span>
-          <a id="sketch-link" href="#" target="_blank" rel="noreferrer">Ver boceto original <span aria-hidden="true">↗</span></a>
-        </footer>
+        <footer class="page-footer"><span>CANESMART <i>·</i> Recorrido virtual de práctica</span><a id="sketch-link" href="#" target="_blank" rel="noreferrer">Ver boceto original <span aria-hidden="true">↗</span></a></footer>
       </main>
     </div>
     <script type="module" src="/src/main.js"></script>
