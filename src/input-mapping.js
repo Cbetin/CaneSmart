@@ -29,8 +29,8 @@ export function keyboardAction(code) {
 function axesFor(inputSource) {
   const gamepad = inputSource?.gamepad;
   const axes = gamepad?.axes ?? [];
-  // xr-standard uses axes 0/1 for the touchpad and axes 2/3 for the thumbstick.
-  const stickIndex = gamepad?.mapping === 'xr-standard' || axes.length >= 4 ? 2 : 0;
+  // Four-axis XR gamepads place the thumbstick on axes 2/3; two-axis devices use 0/1.
+  const stickIndex = axes.length >= 4 ? 2 : 0;
   return { x: axisValue(axes[stickIndex] ?? 0), y: axisValue(axes[stickIndex + 1] ?? 0) };
 }
 

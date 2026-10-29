@@ -98,6 +98,22 @@ test('keyboard and Quest gamepad inputs map to the same route controls', () => {
   assert.equal(xr.restart, true);
 });
 
+test('xr-standard gamepads with two axes fall back to axes 0 and 1', () => {
+  const xr = readXRInputSources([
+    {
+      handedness: 'left',
+      gamepad: {
+        mapping: 'xr-standard',
+        axes: [0.5, -0.75],
+        buttons: [],
+      },
+    },
+  ]);
+
+  assert.ok(xr.moveX > 0.4);
+  assert.ok(xr.forward > 0.6);
+});
+
 test('adequate support is faster and steadier than excessive support', () => {
   const balanced = createGameState({ showInstructions: false });
   const excessive = createGameState({ showInstructions: false });
