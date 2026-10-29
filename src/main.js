@@ -44,11 +44,14 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const fmt = new Intl.NumberFormat('es-CO');
 
 let gameState = createGameState();
+let appMode = 'product';
 let scene;
 let camera;
 let renderer;
 let controls;
 let worldGroup;
+let courseGroup;
+let productPlatform;
 let playerAvatar;
 let avatarHead;
 let avatarTorso;
@@ -127,21 +130,24 @@ function setupThree() {
   renderer.xr.setReferenceSpaceType('local-floor');
   mount.appendChild(renderer.domElement);
   renderer.domElement.setAttribute('role', 'img');
-  renderer.domElement.setAttribute('aria-label', 'Recorrido 3D jugable de CaneSmart');
+  renderer.domElement.setAttribute('aria-label', 'Visor 3D de CaneSmart: arrastra para rotar el bastón y desplázate para acercar');
 
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x09140f);
   scene.fog = new THREE.Fog(0x09140f, 17, 48);
 
   camera = new THREE.PerspectiveCamera(36, mount.clientWidth / Math.max(mount.clientHeight, 1), 0.02, 90);
-  camera.position.set(2.25, 2.25, 2.95);
+  camera.position.set(1.55, 1.4, 1.83);
   scene.add(camera);
   controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(0, 0.88, -3.8);
+  controls.target.set(0.34, 0.62, -0.42);
   controls.enableDamping = true;
   controls.dampingFactor = 0.07;
-  controls.minDistance = 3.8;
-  controls.maxDistance = 12;
+  controls.enableRotate = true;
+  controls.enableZoom = true;
+  controls.enablePan = false;
+  controls.minDistance = 1.35;
+  controls.maxDistance = 5.8;
   controls.maxPolarAngle = Math.PI * 0.48;
   controls.update();
   controls.saveState();
@@ -150,13 +156,19 @@ function setupThree() {
   worldGroup = new THREE.Group();
   worldGroup.name = 'Recorrido CaneSmart';
   scene.add(worldGroup);
+  courseGroup = new THREE.Group();
+  courseGroup.name = 'Geometría de la ruta';
+  courseGroup.visible = false;
+  worldGroup.add(courseGroup);
   buildCourse();
+  createProductPlatform();
   createPlayer();
   createCaneStand();
   createXRHud();
   createWorldBoard();
   createComfortMask();
   addXRControllers();
+  activateProductPresentation();
   loadCaneModel();
   setWebXRSupport();
 
@@ -185,6 +197,10 @@ function addLighting() {
   const fill = new THREE.DirectionalLight(0x80c59a, 1.1);
   fill.position.set(-4, 4, -8);
   scene.add(fill);
+
+  const productFill = new THREE.DirectionalLight(0xffe7c4, 1.15);
+  productFill.position.set(-2.2, 3.4, 3.1);
+  scene.add(productFill);
 
   const gateLight = new THREE.PointLight(0x8dd6a3, 4.3, 9, 1.7);
   gateLight.position.set(0, 2.1, -33);
@@ -256,7 +272,7 @@ function makeCourseGate(z, title, subtitle, { finish = false } = {}) {
     banner.position.set(0, 2.29, 0.09);
     group.add(banner);
   }
-  worldGroup.add(group);
+  courseGroup.add(group);
   return group;
 }
 
@@ -268,7 +284,7 @@ function buildCourse() {
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(0, -0.035, -15.5);
   floor.receiveShadow = true;
-  worldGroup.add(floor);
+  courseGroup.add(floor);
 
   const road = new THREE.Mesh(
     new THREE.PlaneGeometry(3.55, 38),
@@ -277,20 +293,20 @@ function buildCourse() {
   road.rotation.x = -Math.PI / 2;
   road.position.set(0, -0.012, -15.8);
   road.receiveShadow = true;
-  worldGroup.add(road);
+  courseGroup.add(road);
 
   const railMat = new THREE.MeshStandardMaterial({ color: 0x618c6b, emissive: 0x284a32, emissiveIntensity: 0.72, metalness: 0.42, roughness: 0.3 });
   [-1.78, 1.78].forEach((x) => {
     const rail = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.035, 37.8), railMat);
     rail.position.set(x, 0.012, -15.8);
-    worldGroup.add(rail);
+    courseGroup.add(rail);
   });
 
   const centerMat = new THREE.MeshBasicMaterial({ color: 0x668c6b, transparent: true, opacity: 0.25 });
   for (let z = -1.2; z > GAME_ROUTE.finishZ + 1; z -= 2.15) {
     const dash = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.013, 0.56), centerMat);
     dash.position.set(0, 0.006, z);
-    worldGroup.add(dash);
+    courseGroup.add(dash);
   }
 
   const segmentTints = [0x1d3023, 0x1a2b20, 0x1c2d21];
@@ -302,7 +318,7 @@ function buildCourse() {
     );
     segment.rotation.x = -Math.PI / 2;
     segment.position.set(0, -0.002, (stage.startZ + stage.endZ) / 2);
-    worldGroup.add(segment);
+    courseGroup.add(segment);
   });
 
   makeCourseGate(0.55, 'INICIO', 'Toma el bastón', {});
@@ -310,17 +326,66 @@ function buildCourse() {
   makeCourseGate(-18, 'TRAMO 03', 'Último desafío');
   makeCourseGate(GAME_ROUTE.finishZ - 0.25, 'META', '¡Lo lograste!', { finish: true });
 
-  const stand = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.24, 0.28, 0.09, 40),
-    new THREE.MeshStandardMaterial({ color: 0x253a2b, metalness: 0.48, roughness: 0.34 })
-  );
-  stand.position.set(0.34, 0.038, -0.42);
-  stand.receiveShadow = true;
-  stand.castShadow = true;
-  worldGroup.add(stand);
-
   createTargets();
   createObstacles();
+}
+
+function createProductPlatform() {
+  productPlatform = new THREE.Group();
+  productPlatform.name = 'Plataforma de exhibición del bastón';
+  productPlatform.position.set(0.34, 0, -0.42);
+
+  const baseMaterial = new THREE.MeshStandardMaterial({ color: 0x17251d, metalness: 0.58, roughness: 0.31 });
+  const topMaterial = new THREE.MeshStandardMaterial({ color: 0x263b2e, metalness: 0.48, roughness: 0.3, emissive: 0x0d1c12, emissiveIntensity: 0.4 });
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.66, 0.74, 0.075, 80), baseMaterial);
+  base.position.y = 0.0375;
+  base.castShadow = true;
+  base.receiveShadow = true;
+  productPlatform.add(base);
+
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.66, 0.66, 0.012, 80), topMaterial);
+  top.position.y = 0.078;
+  top.castShadow = true;
+  top.receiveShadow = true;
+  productPlatform.add(top);
+
+  const accent = new THREE.MeshBasicMaterial({ color: 0x8dd6a3, transparent: true, opacity: 0.75 });
+  const outerRing = new THREE.Mesh(new THREE.TorusGeometry(0.64, 0.009, 8, 96), accent);
+  outerRing.rotation.x = Math.PI / 2;
+  outerRing.position.y = 0.086;
+  productPlatform.add(outerRing);
+  const innerRing = new THREE.Mesh(
+    new THREE.TorusGeometry(0.48, 0.004, 6, 96),
+    new THREE.MeshBasicMaterial({ color: 0xd6bd82, transparent: true, opacity: 0.38 })
+  );
+  innerRing.rotation.x = Math.PI / 2;
+  innerRing.position.y = 0.086;
+  productPlatform.add(innerRing);
+
+  const halo = new THREE.Mesh(
+    new THREE.TorusGeometry(0.78, 0.006, 8, 96),
+    new THREE.MeshBasicMaterial({ color: 0x8ec99c, transparent: true, opacity: 0.24, depthWrite: false })
+  );
+  halo.position.set(0, 0.72, -0.32);
+  productPlatform.add(halo);
+
+  const shadowCanvas = document.createElement('canvas');
+  shadowCanvas.width = shadowCanvas.height = 128;
+  const ctx = shadowCanvas.getContext('2d');
+  const gradient = ctx.createRadialGradient(64, 64, 5, 64, 64, 62);
+  gradient.addColorStop(0, 'rgba(0,0,0,.42)');
+  gradient.addColorStop(0.45, 'rgba(0,0,0,.2)');
+  gradient.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 128, 128);
+  const shadow = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.8, 1.8),
+    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(shadowCanvas), transparent: true, depthWrite: false })
+  );
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.position.y = 0.085;
+  productPlatform.add(shadow);
+  worldGroup.add(productPlatform);
 }
 
 function createTargets() {
@@ -359,7 +424,7 @@ function createTargets() {
     group.add(marker);
 
     group.userData = { id: zone.id, ring, glow, marker };
-    worldGroup.add(group);
+    courseGroup.add(group);
     zoneVisuals.push(group);
   }
 }
@@ -392,7 +457,7 @@ function createObstacles() {
     halo.position.y = 0.015;
     group.add(halo);
     group.userData = { id: obstacle.id, halo, cone };
-    worldGroup.add(group);
+    courseGroup.add(group);
     obstacleVisuals.push(group);
   }
 }
@@ -410,6 +475,7 @@ function makeCapsule(radius, length, material, position, parent, rotation = [0, 
 function createPlayer() {
   playerAvatar = new THREE.Group();
   playerAvatar.name = 'Personaje virtual';
+  playerAvatar.visible = false;
   const jacket = new THREE.MeshStandardMaterial({ color: 0x74b68a, roughness: 0.6, metalness: 0.04 });
   const pants = new THREE.MeshStandardMaterial({ color: 0x243a31, roughness: 0.76 });
   const skin = new THREE.MeshStandardMaterial({ color: 0xc59b7b, roughness: 0.72 });
@@ -456,6 +522,59 @@ function createCaneStand() {
   worldGroup.add(caneRoot);
 }
 
+function setProductCamera() {
+  if (!camera || !controls || renderer?.xr.isPresenting) return;
+  camera.position.set(1.55, 1.4, 1.83);
+  controls.target.set(0.34, 0.62, -0.42);
+  controls.enableRotate = true;
+  controls.enableZoom = true;
+  controls.enablePan = false;
+  controls.minDistance = 1.35;
+  controls.maxDistance = 5.8;
+  controls.minPolarAngle = 0.12;
+  controls.maxPolarAngle = Math.PI * 0.48;
+  controls.update();
+  controls.saveState();
+}
+
+function setCourseCamera() {
+  if (!camera || !controls || renderer?.xr.isPresenting) return;
+  camera.position.set(2.25, 2.25, 2.95);
+  controls.target.set(0, 0.88, -3.8);
+  controls.enableRotate = true;
+  controls.enableZoom = true;
+  controls.enablePan = false;
+  controls.minDistance = 3.8;
+  controls.maxDistance = 12;
+  controls.minPolarAngle = 0.12;
+  controls.maxPolarAngle = Math.PI * 0.48;
+  controls.update();
+  controls.saveState();
+}
+
+function activateProductPresentation() {
+  if (courseGroup) courseGroup.visible = false;
+  if (playerAvatar) playerAvatar.visible = false;
+  if (worldBoard) worldBoard.visible = false;
+  if (productPlatform) productPlatform.visible = true;
+  viewer.classList.add('is-product-view');
+  if (controls && !renderer?.xr.isPresenting) {
+    controls.enabled = true;
+    setProductCamera();
+  }
+}
+
+function activateCoursePresentation() {
+  if (courseGroup) courseGroup.visible = true;
+  if (playerAvatar) playerAvatar.visible = true;
+  if (productPlatform) productPlatform.visible = true;
+  viewer.classList.remove('is-product-view');
+  if (controls && !renderer?.xr.isPresenting) {
+    controls.enabled = true;
+    setCourseCamera();
+  }
+}
+
 function createWorldBoard() {
   worldBoardCanvas = document.createElement('canvas');
   worldBoardCanvas.width = 640;
@@ -467,6 +586,7 @@ function createWorldBoard() {
   worldBoard = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.75), material);
   worldBoard.position.set(0, 2.28, -1.48);
   worldBoard.renderOrder = 10;
+  worldBoard.visible = false;
   worldGroup.add(worldBoard);
   paintWorldBoard('RUTA CANESMART', ['Aprieta el gatillo para tomar el bastón.', 'Joystick izquierdo: avanza y esquiva.', 'Grip izquierdo ajusta apoyo; mantén un nivel moderado.']);
 }
@@ -849,25 +969,42 @@ function renderUI() {
   const stage = GAME_ROUTE.stages[gameState.stageIndex] ?? GAME_ROUTE.stages.at(-1);
   const stageProgress = getCurrentStageZoneProgress(gameState);
   const journey = Math.round(getJourneyProgress(gameState) * 100);
-  const statusText = gameState.phase === 'instructions'
-    ? 'INSTRUCCIONES'
-    : gameState.phase === 'ready'
-      ? (gameState.caneHeld ? 'LISTO' : 'TOMA EL BASTÓN')
-      : gameState.phase === 'paused'
-        ? 'EN PAUSA'
-        : gameState.phase === 'finished'
-          ? 'EN LA META'
-          : gameState.caneHeld
-            ? 'RECORRIDO ACTIVO'
-            : 'BASTÓN SUELTO';
+  const isProductView = appMode === 'product';
+  const isInstructions = appMode === 'instructions';
+  const isResetChoice = appMode === 'reset-choice';
+  const statusText = isProductView
+    ? 'INSPECCIÓN 3D'
+    : isResetChoice
+      ? 'RECORRIDO REINICIADO'
+      : isInstructions
+        ? 'INSTRUCCIONES'
+        : gameState.phase === 'ready'
+          ? (gameState.caneHeld ? 'LISTO' : 'TOMA EL BASTÓN')
+          : gameState.phase === 'paused'
+            ? 'EN PAUSA'
+            : gameState.phase === 'finished'
+              ? 'EN LA META'
+              : gameState.caneHeld
+                ? 'RECORRIDO ACTIVO'
+                : 'BASTÓN SUELTO';
   const panelStatus = $('#panel-status');
-  panelStatus.classList.toggle('is-playing', gameState.phase === 'playing' && gameState.caneHeld);
-  panelStatus.classList.toggle('is-paused', gameState.phase === 'paused');
-  panelStatus.classList.toggle('is-finished', gameState.phase === 'finished');
-  $('#panel-status-text').textContent = gameState.phase === 'playing' && !gameState.caneHeld ? 'AGARRA EL BASTÓN' : statusText;
+  panelStatus.classList.toggle('is-playing', appMode === 'game' && gameState.phase === 'playing' && gameState.caneHeld);
+  panelStatus.classList.toggle('is-paused', appMode === 'game' && gameState.phase === 'paused');
+  panelStatus.classList.toggle('is-finished', appMode === 'game' && gameState.phase === 'finished');
+  $('#panel-status-text').textContent = appMode === 'game' && gameState.phase === 'playing' && !gameState.caneHeld ? 'AGARRA EL BASTÓN' : statusText;
   $('#viewer-status').textContent = statusText;
-  $('#state-dot').classList.toggle('is-paused', gameState.phase === 'paused');
-  $('#stage-title').textContent = stage.title;
+  $('#state-dot').classList.toggle('is-paused', appMode === 'game' && gameState.phase === 'paused');
+  $('#panel-kicker').textContent = isProductView ? 'MODELO INTERACTIVO' : 'TU RECORRIDO';
+  $('#stage-title').textContent = isProductView ? 'Vista del bastón' : stage.title;
+  $('#product-panel-card').hidden = !isProductView;
+  $('#game-panel-content').hidden = isProductView;
+  $('#route-markers').hidden = isProductView;
+  $('#begin-route').hidden = !isProductView;
+  $('#begin-route').disabled = !modelLoaded;
+  $('#xr-wrap').hidden = appMode !== 'game';
+  takeButton.hidden = appMode !== 'game';
+  pauseButton.hidden = appMode !== 'game';
+  $('#reset-button').hidden = appMode !== 'game';
   $('#stage-number').textContent = `TRAMO ${String(gameState.stageIndex + 1).padStart(2, '0')} / 03`;
   $('#stage-goal').textContent = !gameState.caneHeld && gameState.phase !== 'instructions'
     ? 'Toma el bastón para desbloquear el movimiento; después completa las zonas de este tramo.'
@@ -917,17 +1054,25 @@ function renderUI() {
   $('#take-button-label').textContent = gameState.caneHeld ? 'Soltar bastón' : 'Tomar bastón';
   pauseButton.disabled = !isPlaying;
   pauseButton.setAttribute('aria-label', gameState.phase === 'paused' ? 'Reanudar recorrido' : 'Pausar recorrido');
-  $('#pause-screen').hidden = gameState.phase !== 'paused' || fallDemoState !== 'idle';
-  $('#finish-screen').hidden = gameState.phase !== 'finished';
-  $('#instructions-screen').hidden = gameState.phase !== 'instructions';
-  $('#canvas-objective').textContent = gameState.phase === 'instructions'
-    ? 'Lee las instrucciones y toma el bastón'
-    : gameState.phase === 'ready' || !gameState.caneHeld
-      ? 'Sin bastón no puedes avanzar'
-      : gameState.phase === 'finished'
-        ? 'Recorrido completo · puedes volver a jugar'
-        : stage.goal;
-  $('#canvas-objective-label').textContent = gameState.phase === 'finished' ? 'META' : `TRAMO ${String(gameState.stageIndex + 1).padStart(2, '0')} · OBJETIVO`;
+  $('#pause-screen').hidden = appMode !== 'game' || gameState.phase !== 'paused' || fallDemoState !== 'idle';
+  $('#finish-screen').hidden = appMode !== 'game' || gameState.phase !== 'finished';
+  $('#instructions-screen').hidden = appMode !== 'instructions';
+  $('#reset-choice-screen').hidden = appMode !== 'reset-choice';
+  $('#return-product-from-game').hidden = appMode !== 'game';
+  $('#canvas-objective').textContent = isProductView
+    ? 'Arrastra para girar · rueda para acercar'
+    : isInstructions
+      ? 'Lee las instrucciones y prepara el recorrido'
+      : gameState.phase === 'ready' || !gameState.caneHeld
+        ? 'Sin bastón no puedes avanzar'
+        : gameState.phase === 'finished'
+          ? 'Recorrido completo · puedes volver a jugar'
+          : stage.goal;
+  $('#canvas-objective-label').textContent = isProductView
+    ? 'INSPECCIÓN DEL MODELO 3D'
+    : gameState.phase === 'finished'
+      ? 'META'
+      : `TRAMO ${String(gameState.stageIndex + 1).padStart(2, '0')} · OBJETIVO`;
   updateFallDemoUI();
   updateWorldBoard();
 }
@@ -941,6 +1086,10 @@ function formatTime(seconds) {
 
 function updateWorldBoard() {
   if (!worldBoard) return;
+  if (appMode === 'product') {
+    worldBoard.visible = false;
+    return;
+  }
   if (fallDemoState === 'alerting') {
     worldBoard.visible = true;
     paintWorldBoard('ALERTA SIMULADA', ['La caída y la respuesta ocurren solo en esta demo.', 'No se enviaron llamadas ni mensajes.', 'Responde o cierra la prueba desde el panel.']);
@@ -973,7 +1122,7 @@ function showFinishScreen() {
   renderUI();
 }
 
-function resetRun() {
+function resetRun({ showChoices = false } = {}) {
   if (activeController && worldGroup && caneRoot) {
     worldGroup.attach(caneRoot);
     activeController = null;
@@ -982,10 +1131,12 @@ function resetRun() {
     worldGroup.attach(caneRoot);
   }
   gameState = resetGame({ showInstructions: false });
+  appMode = showChoices ? 'reset-choice' : 'game';
   fallDemoState = 'idle';
   fallDemoPausedRun = false;
   viewer.classList.remove('is-alerting');
   if (caneRoot) {
+    caneRoot.visible = true;
     caneRoot.position.set(0.34, PLATFORM_TOP, -0.42);
     caneRoot.rotation.set(0, DEFAULT_YAW, 0);
   }
@@ -996,19 +1147,63 @@ function resetRun() {
   }
   pressedKeys.clear();
   Object.keys(mouseMove).forEach((key) => { mouseMove[key] = false; });
-  if (controls) {
-    const immersive = Boolean(renderer?.xr.isPresenting);
-    controls.enabled = !immersive;
-    if (!immersive) controls.reset();
-  }
+  activateCoursePresentation();
+  const immersive = Boolean(renderer?.xr.isPresenting);
+  if (controls) controls.enabled = !immersive;
   renderUI();
-  setMessage('Recorrido reiniciado · toma el bastón para empezar.', 'good');
+  if (showChoices) $('#game-toast').hidden = true;
+  else setMessage('Recorrido reiniciado · toma el bastón para empezar.', 'good');
+}
+
+function showRouteInstructions() {
+  if (appMode !== 'product' || !modelLoaded) return;
+  appMode = 'instructions';
+  pressedKeys.clear();
+  Object.keys(mouseMove).forEach((key) => { mouseMove[key] = false; });
+  activateCoursePresentation();
+  renderUI();
+}
+
+function returnToProductView() {
+  if (activeController && worldGroup && caneRoot) {
+    worldGroup.attach(caneRoot);
+    activeController = null;
+    activeGripKind = '';
+  } else if (playerAvatar && caneRoot?.parent === playerAvatar) {
+    worldGroup.attach(caneRoot);
+  }
+  gameState = createGameState();
+  appMode = 'product';
+  fallDemoState = 'idle';
+  fallDemoPausedRun = false;
+  viewer.classList.remove('is-alerting');
+  if (worldGroup) worldGroup.position.set(0, 0, 0);
+  if (playerAvatar) {
+    playerAvatar.position.set(0, 0, 0);
+    playerAvatar.rotation.set(0, 0, 0);
+  }
+  if (caneRoot) {
+    caneRoot.visible = true;
+    caneRoot.position.set(0.34, PLATFORM_TOP, -0.42);
+    caneRoot.rotation.set(0, DEFAULT_YAW, 0);
+  }
+  pressedKeys.clear();
+  Object.keys(mouseMove).forEach((key) => { mouseMove[key] = false; });
+  activateProductPresentation();
+  if (controls) controls.enabled = !renderer?.xr.isPresenting;
+  $('#game-toast').hidden = true;
+  renderUI();
 }
 
 function startFromInstructions() {
+  if (appMode !== 'instructions') return;
   dismissInstructions(gameState);
+  appMode = 'game';
+  pressedKeys.clear();
+  Object.keys(mouseMove).forEach((key) => { mouseMove[key] = false; });
   instructionsScreen.hidden = true;
-  if (controls) controls.enabled = true;
+  activateCoursePresentation();
+  if (controls) controls.enabled = !renderer?.xr.isPresenting;
   setMessage('Toma el bastón para desbloquear el recorrido.', 'good', 2800);
   ensureAudio();
   renderUI();
@@ -1103,34 +1298,41 @@ function resolveFallDemo() {
 
 function handleKeyboardAction(action) {
   if (action === 'start') {
-    if (gameState.phase === 'instructions') startFromInstructions();
+    if (appMode === 'product') showRouteInstructions();
+    else if (appMode === 'instructions') startFromInstructions();
     else if (gameState.phase === 'paused') pauseOrResume();
     else if (gameState.phase === 'finished') resetRun();
   } else if (action === 'grab') {
-    if (gameState.phase === 'instructions') return;
+    if (appMode !== 'game' || gameState.phase === 'instructions') return;
     if (gameState.caneHeld) releaseCaneToCourse();
     else grabForDesktop();
   } else if (action === 'pause') {
+    if (appMode !== 'game') return;
     if (fallDemoState !== 'idle') resolveFallDemo();
     else pauseOrResume();
   } else if (action === 'restart') {
-    resetRun();
+    if (appMode === 'game') resetRun({ showChoices: true });
   } else if (action === 'fall') {
-    startFallDemo();
+    if (appMode === 'game') startFallDemo();
   }
 }
 
 function setupDesktopControls() {
+  $('#begin-route').addEventListener('click', showRouteInstructions);
   $('#start-game').addEventListener('click', startFromInstructions);
   $('#take-button').addEventListener('click', () => {
     if (gameState.caneHeld) releaseCaneToCourse();
     else grabForDesktop();
   });
   $('#pause-button').addEventListener('click', pauseOrResume);
-  $('#reset-button').addEventListener('click', resetRun);
+  $('#reset-button').addEventListener('click', () => resetRun({ showChoices: true }));
   $('#resume-game').addEventListener('click', pauseOrResume);
-  $('#reset-from-pause').addEventListener('click', resetRun);
-  $('#replay-game').addEventListener('click', resetRun);
+  $('#reset-from-pause').addEventListener('click', () => resetRun({ showChoices: true }));
+  $('#replay-game').addEventListener('click', () => resetRun());
+  $('#reset-play-again').addEventListener('click', () => resetRun());
+  $('#reset-return-product').addEventListener('click', returnToProductView);
+  $('#finish-return-product').addEventListener('click', returnToProductView);
+  $('#return-product-from-game').addEventListener('click', returnToProductView);
   $('#simulate-fall').addEventListener('click', startFallDemo);
   $('#reply-contact').addEventListener('click', simulateContactResponse);
   $('#resolve-alert').addEventListener('click', resolveFallDemo);
@@ -1264,6 +1466,8 @@ function onXRSessionStart() {
   controllers.forEach((controller) => { if (controller.userData.ray) controller.userData.ray.visible = true; });
   if (gameState.phase === 'instructions') {
     dismissInstructions(gameState);
+    appMode = 'game';
+    activateCoursePresentation();
     instructionsScreen.hidden = true;
   }
   setXRMessage('En Meta Quest', 'Joystick: avanzar y esquivar. L3: acelerar. Gatillo: sujetar. Grip izquierdo: apoyo.', 'A/X para pausa; Y/B para reiniciar. No necesitas caminar físicamente por la habitación.', true);
@@ -1299,6 +1503,7 @@ function resizeRenderer() {
 }
 
 function activeGameInput(delta) {
+  if (appMode !== 'game') return { moveX: 0, forward: 0, sprint: false, speedScale: 1 };
   if (renderer.xr.isPresenting) {
     const session = renderer.xr.getSession();
     const sources = session ? Array.from(session.inputSources) : [];

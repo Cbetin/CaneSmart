@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#101b17" />
-    <meta name="description" content="Recorre CaneSmart en una experiencia 3D jugable. Los valores de esfuerzo y apoyo son simulados y no son una evaluación médica." />
+    <meta name="description" content="Inspecciona el bastón CaneSmart en 3D antes de iniciar la ruta. Los valores de esfuerzo y apoyo del juego son simulados y no son una evaluación médica." />
     <title>CaneSmart — Ruta de confianza</title>
   </head>
   <body>
@@ -29,8 +29,8 @@
         <section class="intro" aria-labelledby="page-title">
           <div class="intro-copy">
             <div class="eyebrow"><span class="eyebrow-line"></span>RECORRIDO INTERACTIVO · 3D</div>
-            <h1 id="page-title">Avanza a tu <span>propio ritmo.</span></h1>
-            <p>Toma el bastón, mantén un apoyo moderado, esquiva los obstáculos y cruza las zonas de luz hasta llegar a la meta.</p>
+            <h1 id="page-title">Conoce el bastón. <span>Luego, inicia la ruta.</span></h1>
+            <p>Inspecciona el mismo Baston_2.obj en 3D: arrastra para girarlo y usa la rueda para acercarlo. El recorrido comienza solo cuando pulses «Iniciar recorrido».</p>
           </div>
           <div class="route-summary" aria-label="Resumen del recorrido">
             <span class="summary-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 18.5c3.5 0 2-13 6-13s2.5 13 8 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="2.4 3"/><circle cx="5" cy="18.5" r="2" fill="currentColor"/><circle cx="19" cy="18.5" r="2" fill="currentColor"/><path d="M11 5.5h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></span>
@@ -39,19 +39,19 @@
         </section>
 
         <section class="workspace" aria-label="Juego CaneSmart">
-          <div class="viewer-shell" id="viewer-shell">
+          <div class="viewer-shell is-product-view" id="viewer-shell">
             <div class="scene-canvas" id="scene" aria-label="Recorrido 3D de CaneSmart"></div>
             <div class="viewer-vignette" aria-hidden="true"></div>
 
             <div class="viewer-topline">
               <div class="viewer-id">
                 <span class="viewer-id-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none"><path d="M9 2.1v13.8M5.1 4.2l7.8 9.6M12.9 4.2l-7.8 9.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="9" cy="9" r="2" fill="currentColor"/></svg></span>
-                <span><strong>RUTA CANESMART</strong><small id="model-status">Preparando Baston_2.obj…</small></span>
+                <span><strong>VISTA DEL BASTÓN</strong><small id="model-status">Preparando Baston_2.obj…</small></span>
               </div>
-              <div class="viewer-live"><span class="live-ring" id="state-dot"></span><span id="viewer-status">INSTRUCCIONES · 20 S</span></div>
+              <div class="viewer-live"><span class="live-ring" id="state-dot"></span><span id="viewer-status">INSPECCIÓN 3D</span></div>
             </div>
 
-            <div class="route-markers" aria-hidden="true"><span>INICIO</span><i></i><span>META</span></div>
+            <div class="route-markers" id="route-markers" aria-hidden="true" hidden><span>INICIO</span><i></i><span>META</span></div>
 
             <div class="viewer-bottomline">
               <div class="viewer-caption">
@@ -59,21 +59,24 @@
                 <span class="caption-title" id="canvas-objective">Toma el bastón para comenzar</span>
               </div>
               <div class="viewer-actions">
-                <div class="xr-wrap">
+                <button class="begin-route-button" id="begin-route" type="button" disabled>
+                  <span>Iniciar recorrido</span><span class="begin-route-arrow" aria-hidden="true">→</span>
+                </button>
+                <div class="xr-wrap" id="xr-wrap" hidden>
                   <button class="xr-button" id="enter-vr" type="button" disabled aria-label="Entrar en modo inmersivo WebXR">
                     <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 6.3h14a1.8 1.8 0 0 1 1.8 1.8v4.1a1.8 1.8 0 0 1-2.4 1.7l-2.8-1a5.6 5.6 0 0 0-3.8 0l-2.8 1A1.8 1.8 0 0 1 4.8 12V8.1A1.8 1.8 0 0 1 3 6.3Z" stroke="currentColor" stroke-width="1.4"/><path d="M6 8.5v3M4.5 10h3M13.4 9.4h.01M15.7 10.8h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                     <span id="xr-button-label">Comprobando WebXR</span>
                   </button>
                   <span class="xr-tooltip" id="xr-support-note">Meta Quest · pulsa gatillo o grip para sujetar el bastón.</span>
                 </div>
-                <button class="take-button" id="take-button" type="button" disabled>
+                <button class="take-button" id="take-button" type="button" disabled hidden>
                   <svg class="take-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6.1 10.2V5.7a1.3 1.3 0 0 1 2.6 0v3.1-4.4a1.3 1.3 0 0 1 2.6 0v4-3.1a1.3 1.3 0 0 1 2.6 0v4-1.1a1.3 1.3 0 0 1 2.6 0v5.2c0 2.7-1.7 4.5-4.4 4.5h-1.8c-1.5 0-2.6-.5-3.5-1.6l-2.6-3.2a1.5 1.5 0 0 1 2.2-2l1.5 1.3" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   <span id="take-button-label">Tomar bastón</span><kbd>E</kbd>
                 </button>
-                <button class="pause-button" id="pause-button" type="button" disabled aria-label="Pausar recorrido">
+                <button class="pause-button" id="pause-button" type="button" disabled hidden aria-label="Pausar recorrido">
                   <svg viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M6.5 4.5v9M11.5 4.5v9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                 </button>
-                <button class="reset-view-button" id="reset-button" type="button" aria-label="Reiniciar recorrido (R)" title="Reiniciar recorrido (R)">
+                <button class="reset-view-button" id="reset-button" type="button" hidden aria-label="Reiniciar recorrido (R)" title="Reiniciar recorrido (R)">
                   <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3.3 8a6.8 6.8 0 1 1 .4 4.7M3.3 3.7V8h4.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
               </div>
@@ -90,7 +93,7 @@
               <span>Prueba con un navegador actualizado y activa la aceleración gráfica.</span>
             </div>
 
-            <div class="screen-overlay" id="instructions-screen" role="dialog" aria-modal="true" aria-labelledby="instructions-title">
+            <div class="screen-overlay" id="instructions-screen" role="dialog" aria-modal="true" aria-labelledby="instructions-title" hidden>
               <div class="intro-card">
                 <div class="intro-card-top"><span class="game-kicker"><span></span>ANTES DE EMPEZAR</span><span class="read-time">LECTURA · 20 S</span></div>
                 <h2 id="instructions-title">Una ruta. <em>Tu ritmo.</em></h2>
@@ -131,8 +134,23 @@
                   <div><small>OBSTÁCULOS EVITADOS</small><strong id="final-obstacles">0 / 7</strong></div>
                   <div><small>ZONAS COMPLETADAS</small><strong id="final-zones">0 / 7</strong></div>
                 </div>
-                <button class="start-game-button" id="replay-game" type="button">Jugar de nuevo <span aria-hidden="true">↻</span></button>
+                <div class="finish-actions">
+                  <button class="start-game-button" id="replay-game" type="button">Jugar de nuevo <span aria-hidden="true">↻</span></button>
+                  <button class="quiet-button" id="finish-return-product" type="button">Volver a ver el bastón</button>
+                </div>
                 <small class="finish-disclaimer">Las cifras de esfuerzo mostradas durante el juego fueron simuladas; no son signos vitales ni una evaluación médica.</small>
+              </div>
+            </div>
+
+            <div class="screen-overlay" id="reset-choice-screen" role="dialog" aria-modal="true" aria-labelledby="reset-choice-title" hidden>
+              <div class="pause-card reset-choice-card">
+                <span class="game-kicker"><span></span>RECORRIDO REINICIADO</span>
+                <h2 id="reset-choice-title">¿Qué quieres hacer ahora?</h2>
+                <p>El tiempo, los puntos y la estamina del juego se reiniciaron.</p>
+                <div class="pause-actions">
+                  <button class="start-game-button" id="reset-play-again" type="button">Jugar de nuevo <span aria-hidden="true">→</span></button>
+                  <button class="quiet-button" id="reset-return-product" type="button">Volver a ver el bastón</button>
+                </div>
               </div>
             </div>
 
@@ -142,10 +160,20 @@
 
           <aside class="game-panel" aria-label="Objetivos y controles del recorrido">
             <div class="panel-heading">
-              <div><span class="section-kicker">TU RECORRIDO</span><h2 id="stage-title">Agarre y equilibrio</h2></div>
-              <span class="panel-status" id="panel-status"><span></span><span id="panel-status-text">PREPARA</span></span>
+              <div><span class="section-kicker" id="panel-kicker">MODELO INTERACTIVO</span><h2 id="stage-title">Vista del bastón</h2></div>
+              <span class="panel-status" id="panel-status"><span></span><span id="panel-status-text">INSPECCIÓN 3D</span></span>
             </div>
 
+            <section class="product-panel-card" id="product-panel-card" aria-label="Información del modelo CaneSmart">
+              <span class="product-card-icon" aria-hidden="true">◎</span>
+              <span class="section-kicker">BASTON_2.OBJ · VISOR 3D</span>
+              <h3>Explóralo antes de empezar.</h3>
+              <p>El modelo se muestra completo sobre su plataforma. Arrastra para girarlo; desplázate con la rueda para acercar o alejar.</p>
+              <div class="product-card-divider"></div>
+              <p class="product-card-note">La inspección no inicia el reloj ni modifica la estamina. Las lecturas que verás en el recorrido son simuladas y no médicas.</p>
+            </section>
+
+            <div class="game-panel-content" id="game-panel-content" hidden>
             <div class="journey-block">
               <div class="journey-meta"><span id="stage-number">TRAMO 01 / 03</span><strong><span id="journey-progress-text">0</span>%</strong></div>
               <div class="journey-bar"><i id="journey-progress-bar"></i></div>
@@ -215,12 +243,14 @@
               <button class="sprint-button" id="sprint-button" type="button"><span aria-hidden="true">»</span> Mantén para caminar deprisa <kbd>Shift</kbd></button>
             </section>
 
+            <button class="panel-return-button" id="return-product-from-game" type="button">Volver a ver el bastón</button>
             <label class="comfort-card" for="comfort-toggle">
               <span class="comfort-mark" aria-hidden="true">◉</span>
               <span><strong>Desplazamiento cómodo</strong><small>Menos velocidad y viñeta suave en VR.</small></span>
               <input id="comfort-toggle" type="checkbox" checked />
               <i class="toggle-track" aria-hidden="true"><b></b></i>
             </label>
+            </div>
           </aside>
         </section>
 

@@ -50,6 +50,15 @@ function followRoute(state, startWaypoint = 0, endWaypoint = safeRouteWaypoints.
   if (endWaypoint === safeRouteWaypoints.length) moveComfortably(state, { forward: 1 });
 }
 
+test('the initial inspection phase does not advance time, movement, or stamina', () => {
+  const state = createGameState();
+  assert.equal(state.phase, 'instructions');
+  tick(state, { forward: 1, sprint: true }, 40);
+  assert.equal(state.elapsed, 0);
+  assert.equal(state.player.z, GAME_ROUTE.startZ);
+  assert.equal(state.stamina, 100);
+});
+
 test('the player cannot advance before taking the cane, and dropping it locks movement', () => {
   const state = createGameState({ showInstructions: false });
   tick(state, { forward: 1 }, 20);
