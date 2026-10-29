@@ -1,3 +1,8 @@
+export const STAMINA_EVENT_EFFECTS = Object.freeze({
+  zoneCollected: 9,
+  obstacleCollision: -18,
+});
+
 export const GAME_ROUTE = Object.freeze({
   startZ: 0,
   finishZ: -33,
@@ -144,7 +149,6 @@ function collectZones(state, events) {
     state.collectedZones.push(zone.id);
     state.zonesCompleted += 1;
     state.points += 25;
-    state.stamina = clamp(state.stamina + 9, 0, 100);
     events.push({ type: 'zone', id: zone.id, points: 25 });
   }
 }
@@ -159,7 +163,6 @@ function checkObstacleCollisions(state, previousZ, events) {
     if (lateralDistance < 0.47 && zDistance < 0.43) {
       state.obstacleResults[obstacle.id] = 'hit';
       state.points = Math.max(0, state.points - 15);
-      state.stamina = clamp(state.stamina - 18, 0, 100);
       state.balance = clamp(state.balance - 0.24, 0, 1);
       state.collisionLock = 0.36;
       state.player.x = clamp(state.player.x + (state.player.x <= obstacle.x ? -0.38 : 0.38), GAME_ROUTE.minX, GAME_ROUTE.maxX);
@@ -249,8 +252,12 @@ export function stepGame(state, input = {}, deltaSeconds = 1 / 60) {
   if (moving) staminaDelta -= input.sprint ? 8.5 * dt : 1.65 * dt;
   if (excessSupport) staminaDelta -= (moving ? 5.5 : 2.2) * dt;
   if (!moving) staminaDelta += state.safeZone ? 13 * dt : 2.2 * dt;
-  if (events.some((event) => event.type === 'collision')) staminaDelta -= 18;
-  if (events.some((event) => event.type === 'zone')) staminaDelta += 5;
+  const eventStaminaDelta = events.reduce((total, event) => {
+    if (event.type === 'collision') return total + STAMINA_EVENT_EFFECTS.obstacleCollision;
+    if (event.type === 'zone') return total + STAMINA_EVENT_EFFECTS.zoneCollected;
+    return total;
+  }, 0);
+  staminaDelta += eventStaminaDelta;
   state.stamina = clamp(state.stamina + staminaDelta, 0, 100);
 
   if (!hasCane) state.balance = clamp(state.balance - 0.24 * dt, 0, 1);

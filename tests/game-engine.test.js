@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   GAME_ROUTE,
+  STAMINA_EVENT_EFFECTS,
   createGameState,
   dismissInstructions,
   dropCane,
@@ -19,6 +20,35 @@ const tick = (state, input = {}, count = 1) => {
   for (let index = 0; index < count; index += 1) events.push(...stepGame(state, input, 0.05));
   return events;
 };
+
+const safeRouteWaypoints = [
+  [0, -2.1], [0.62, -4.55], [0.9, -6.3],
+  [0.9, -8.8], [-0.64, -10.05], [0.9, -11.5], [0.9, -13.2], [0.62, -14.85], [-0.9, -15.4], [-0.9, -18.2],
+  [0.9, -18.7], [0.62, -21.15], [-0.9, -21.5], [-0.9, -24], [-0.62, -25.05], [0.9, -25.5], [0.9, -28], [0.62, -29.2], [-0.9, -29.5], [-0.9, -32.9], [-0.9, -33.0],
+];
+
+function moveComfortably(state, input) {
+  return tick(state, { ...input, speedScale: 0.72 });
+}
+
+function moveTo(state, x, z) {
+  let guard = 0;
+  while (Math.abs(state.player.x - x) > 0.025 && guard++ < 600) {
+    moveComfortably(state, { moveX: Math.sign(x - state.player.x) });
+  }
+  assert.ok(guard < 600, `failed to strafe to x=${x} at z=${z}`);
+
+  guard = 0;
+  while (Math.abs(state.player.z - z) > 0.025 && guard++ < 1200) {
+    moveComfortably(state, { forward: state.player.z > z ? 1 : -1 });
+  }
+  assert.ok(guard < 1200, `failed to reach z=${z} from z=${state.player.z}`);
+}
+
+function followRoute(state, startWaypoint = 0, endWaypoint = safeRouteWaypoints.length) {
+  safeRouteWaypoints.slice(startWaypoint, endWaypoint).forEach(([x, z]) => moveTo(state, x, z));
+  if (endWaypoint === safeRouteWaypoints.length) moveComfortably(state, { forward: 1 });
+}
 
 test('the player cannot advance before taking the cane, and dropping it locks movement', () => {
   const state = createGameState({ showInstructions: false });
@@ -81,6 +111,45 @@ test('adequate support is faster and steadier than excessive support', () => {
   assert.ok(balanced.balance > excessive.balance);
 });
 
+test('a zone restores exactly 9 stamina once, separate from safe-zone rest recovery', () => {
+  const state = createGameState({ showInstructions: false });
+  grabCane(state);
+  state.player.x = 0;
+  state.player.z = -2.1;
+  state.stamina = 40;
+  const deltaSeconds = 0.05;
+  const startingStamina = state.stamina;
+  const events = stepGame(state, {}, deltaSeconds);
+
+  assert.equal(STAMINA_EVENT_EFFECTS.zoneCollected, 9);
+  assert.equal(events.filter((event) => event.type === 'zone').length, 1);
+  const restRecovery = 13 * deltaSeconds;
+  assert.ok(Math.abs(state.stamina - startingStamina - restRecovery - STAMINA_EVENT_EFFECTS.zoneCollected) < 1e-12);
+
+  const staminaAfterPickup = state.stamina;
+  const nextEvents = stepGame(state, {}, deltaSeconds);
+  assert.equal(nextEvents.filter((event) => event.type === 'zone').length, 0);
+  assert.ok(Math.abs(state.stamina - staminaAfterPickup - restRecovery) < 1e-12);
+});
+
+test('an obstacle collision costs exactly 18 stamina once, plus continuous movement drain', () => {
+  const state = createGameState({ showInstructions: false });
+  grabCane(state);
+  state.stageIndex = 1;
+  state.collectedZones = ['zone-1', 'zone-2'];
+  state.player.x = 0;
+  state.player.z = -7.5;
+  state.stamina = 60;
+  const deltaSeconds = 0.05;
+  const startingStamina = state.stamina;
+  const events = stepGame(state, { forward: 1 }, deltaSeconds);
+
+  assert.equal(STAMINA_EVENT_EFFECTS.obstacleCollision, -18);
+  assert.equal(events.filter((event) => event.type === 'collision').length, 1);
+  const walkingDrain = 1.65 * deltaSeconds;
+  assert.ok(Math.abs(state.stamina - startingStamina + walkingDrain - STAMINA_EVENT_EFFECTS.obstacleCollision) < 1e-12);
+});
+
 test('comfortable locomotion is slower without changing route completion logic', () => {
   const standard = createGameState({ showInstructions: false });
   const comfortable = createGameState({ showInstructions: false });
@@ -97,27 +166,7 @@ test('a complete three-stage route can be played from start to finish without co
   assert.equal(GAME_ROUTE.stages.length, 3);
   assert.equal(grabCane(state), true);
 
-  const move = (input) => tick(state, { ...input, speedScale: 0.72 });
-  const moveTo = (x, z) => {
-    let guard = 0;
-    while (Math.abs(state.player.x - x) > 0.025 && guard++ < 600) {
-      move({ moveX: Math.sign(x - state.player.x) });
-    }
-    assert.ok(guard < 600, `failed to strafe to x=${x} at z=${z}`);
-
-    guard = 0;
-    while (Math.abs(state.player.z - z) > 0.025 && guard++ < 1200) {
-      move({ forward: state.player.z > z ? 1 : -1 });
-    }
-    assert.ok(guard < 1200, `failed to reach z=${z} from z=${state.player.z}`);
-  };
-
-  [
-    [0, -2.1], [0.62, -4.55], [0.9, -6.3],
-    [0.9, -8.8], [-0.64, -10.05], [0.9, -11.5], [0.9, -13.2], [0.62, -14.85], [-0.9, -15.4], [-0.9, -18.2],
-    [0.9, -18.7], [0.62, -21.15], [-0.9, -21.5], [-0.9, -24], [-0.62, -25.05], [0.9, -25.5], [0.9, -28], [0.62, -29.2], [-0.9, -29.5], [-0.9, -32.9], [-0.9, -33.0],
-  ].forEach(([x, z]) => moveTo(x, z));
-  move({ forward: 1 });
+  followRoute(state);
 
   assert.equal(state.phase, 'finished');
   assert.equal(state.stageIndex, 2);
@@ -132,6 +181,22 @@ test('a complete three-stage route can be played from start to finish without co
   assert.equal(togglePause(state), 'finished');
   assert.equal(resetGame().phase, 'ready');
   assert.ok(finishedAt > 0);
+});
+
+test('the route can still be completed after an obstacle collision', () => {
+  const state = createGameState({ showInstructions: false });
+  grabCane(state);
+  followRoute(state, 0, 3);
+
+  moveTo(state, 0, -7.5);
+  assert.equal(state.obstacleResults['obstacle-1'], 'hit');
+  followRoute(state, 3);
+
+  assert.equal(state.phase, 'finished');
+  assert.equal(state.zonesCompleted, 7);
+  assert.equal(state.obstacleResults['obstacle-1'], 'hit');
+  assert.equal(Object.values(state.obstacleResults).filter((result) => result === 'hit').length, 1);
+  assert.equal(getJourneyProgress(state), 1);
 });
 
 test('pause freezes movement and the elapsed timer', () => {
