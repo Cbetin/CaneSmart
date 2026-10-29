@@ -27,8 +27,11 @@ export function keyboardAction(code) {
 }
 
 function axesFor(inputSource) {
-  const axes = inputSource?.gamepad?.axes ?? [];
-  return { x: axisValue(axes[0] ?? 0), y: axisValue(axes[1] ?? 0) };
+  const gamepad = inputSource?.gamepad;
+  const axes = gamepad?.axes ?? [];
+  // xr-standard uses axes 0/1 for the touchpad and axes 2/3 for the thumbstick.
+  const stickIndex = gamepad?.mapping === 'xr-standard' || axes.length >= 4 ? 2 : 0;
+  return { x: axisValue(axes[stickIndex] ?? 0), y: axisValue(axes[stickIndex + 1] ?? 0) };
 }
 
 function buttonPressed(inputSource, index) {
@@ -45,7 +48,7 @@ export function readXRInputSources(inputSources = []) {
   return {
     moveX: movement.x,
     forward: -movement.y,
-    sprint: buttonPressed(left, 2),
+    sprint: buttonPressed(left, 3), // L3 press in xr-standard mapping.
     support: 0.42 + squeeze * 0.48,
     pause: buttonPressed(left, 4) || buttonPressed(right, 4),
     restart: buttonPressed(left, 5) || buttonPressed(right, 5),

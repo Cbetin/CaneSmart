@@ -80,8 +80,9 @@ test('keyboard and Quest gamepad inputs map to the same route controls', () => {
     {
       handedness: 'left',
       gamepad: {
-        axes: [0.5, -0.75, 0, 0],
-        buttons: [{}, { value: 0.5 }, { pressed: true }, {}, { pressed: false }, { pressed: false }],
+        mapping: 'xr-standard',
+        axes: [0, 0, 0.5, -0.75],
+        buttons: [{}, { value: 0.5 }, { pressed: false }, { pressed: true }, { pressed: false }, { pressed: false }],
       },
     },
     {
