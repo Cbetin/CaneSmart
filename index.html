@@ -19,7 +19,7 @@
           <span class="brand-context">Ruta de confianza</span>
         </a>
         <div class="topbar-right">
-          <span class="topbar-note"><span class="topbar-dot"></span>Juego 3D · 3 tramos</span>
+          <span class="topbar-note"><span class="topbar-dot"></span>Juego 3D · 2 modos</span>
           <span class="topbar-separator" aria-hidden="true"></span>
           <span class="sim-badge"><span class="sim-badge-dot"></span>SIMULACIÓN</span>
         </div>
@@ -30,11 +30,11 @@
           <div class="intro-copy">
             <div class="eyebrow"><span class="eyebrow-line"></span>RECORRIDO INTERACTIVO · 3D</div>
             <h1 id="page-title">Conoce el bastón. <span>Luego, inicia la ruta.</span></h1>
-            <p>Inspecciona el mismo Baston_2.obj en 3D: arrastra para girarlo y usa la rueda para acercarlo. El recorrido comienza solo cuando pulses «Iniciar recorrido».</p>
+            <p>Inspecciona el mismo Baston_2.obj en 3D: arrastra para girarlo y usa la rueda para acercarlo. Después, elige Recorrido libre o la nueva Pista dinámica.</p>
           </div>
           <div class="route-summary" aria-label="Resumen del recorrido">
             <span class="summary-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 18.5c3.5 0 2-13 6-13s2.5 13 8 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="2.4 3"/><circle cx="5" cy="18.5" r="2" fill="currentColor"/><circle cx="19" cy="18.5" r="2" fill="currentColor"/><path d="M11 5.5h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg></span>
-            <span><strong>~ 1 min</strong><small>7 zonas objetivo · 7 obstáculos</small></span>
+            <span><strong>2 modos</strong><small>Recorrido libre · pista corta de 3 carriles</small></span>
           </div>
         </section>
 
@@ -46,7 +46,7 @@
             <div class="viewer-topline">
               <div class="viewer-id">
                 <span class="viewer-id-icon" aria-hidden="true"><svg viewBox="0 0 18 18" fill="none"><path d="M9 2.1v13.8M5.1 4.2l7.8 9.6M12.9 4.2l-7.8 9.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="9" cy="9" r="2" fill="currentColor"/></svg></span>
-                <span><strong>VISTA DEL BASTÓN</strong><small id="model-status">Preparando Baston_2.obj…</small></span>
+                <span><strong id="viewer-id-title">VISTA DEL BASTÓN</strong><small id="model-status">Preparando Baston_2.obj…</small></span>
               </div>
               <div class="viewer-live"><span class="live-ring" id="state-dot"></span><span id="viewer-status">INSPECCIÓN 3D</span></div>
             </div>
@@ -60,7 +60,7 @@
               </div>
               <div class="viewer-actions">
                 <button class="begin-route-button" id="begin-route" type="button" disabled>
-                  <span>Iniciar recorrido</span><span class="begin-route-arrow" aria-hidden="true">→</span>
+                  <span>Elegir modo</span><span class="begin-route-arrow" aria-hidden="true">→</span>
                 </button>
                 <div class="xr-wrap" id="xr-wrap" hidden>
                   <button class="xr-button" id="enter-vr" type="button" disabled aria-label="Entrar en modo inmersivo WebXR">
@@ -96,28 +96,50 @@
               <span>Prueba con un navegador actualizado y activa la aceleración gráfica.</span>
             </div>
 
+            <div class="screen-overlay mode-select-overlay" id="mode-select-screen" role="dialog" aria-modal="true" aria-labelledby="mode-select-title" hidden>
+              <div class="intro-card mode-select-card">
+                <div class="intro-card-top"><span class="game-kicker"><span></span>ELIGE TU EXPERIENCIA</span><span class="read-time">2 MODOS</span></div>
+                <h2 id="mode-select-title">¿Cómo quieres <em>recorrer?</em></h2>
+                <p class="instructions-lead">El Recorrido libre conserva la experiencia principal de Quest. Pista dinámica es una partida corta y opcional, diseñada con comodidad.</p>
+                <div class="mode-card-list">
+                  <button class="mode-choice mode-choice-primary" id="choose-free-mode" type="button">
+                    <span class="mode-choice-number">01</span>
+                    <span class="mode-choice-copy"><strong>Recorrido libre</strong><small>Explora a tu ritmo · movimiento con cámara manual · modo principal de Quest</small></span>
+                    <span class="mode-choice-arrow" aria-hidden="true">→</span>
+                  </button>
+                  <button class="mode-choice" id="choose-dynamic-mode" type="button">
+                    <span class="mode-choice-number">02</span>
+                    <span class="mode-choice-copy"><strong>Pista dinámica</strong><small>Partida corta · tres carriles · esquiva y toca marcas con la punta virtual</small></span>
+                    <span class="mode-choice-arrow" aria-hidden="true">→</span>
+                  </button>
+                </div>
+                <p class="instruction-footnote">En Quest no hace falta caminar ni golpear el suelo real; todos los contactos de la pista son virtuales.</p>
+              </div>
+            </div>
+
             <div class="screen-overlay" id="instructions-screen" role="dialog" aria-modal="true" aria-labelledby="instructions-title" hidden>
               <div class="intro-card">
-                <div class="intro-card-top"><span class="game-kicker"><span></span>ANTES DE EMPEZAR</span><span class="read-time">LECTURA · 20 S</span></div>
-                <h2 id="instructions-title">Una ruta. <em>Tu ritmo.</em></h2>
-                <p class="instructions-lead">Completa tres tramos hasta la meta. Todas las lecturas son simulaciones del juego, no mediciones.</p>
+                <div class="intro-card-top"><span class="game-kicker"><span></span><span id="instructions-kicker">ANTES DE EMPEZAR</span></span><span class="read-time">LECTURA · 20 S</span></div>
+                <h2 id="instructions-title">Una ruta. <em id="instructions-title-em">Tu ritmo.</em></h2>
+                <p class="instructions-lead" id="instructions-lead">Completa tres tramos hasta la meta. Todas las lecturas son simulaciones del juego, no mediciones.</p>
                 <div class="quick-steps">
-                  <div><b>01</b><span><strong>Toma el bastón</strong><small>Sin agarrarlo, el recorrido no avanza.</small></span></div>
-                  <div><b>02</b><span><strong>Busca el equilibrio</strong><small>Apoyo moderado: avanzas mejor; exceso: cuesta más.</small></span></div>
-                  <div><b>03</b><span><strong>Esquiva y pisa luz</strong><small>Evita conos y completa cada zona brillante.</small></span></div>
+                  <div><b>01</b><span><strong id="instruction-step-1-title">Toma el bastón</strong><small id="instruction-step-1-copy">Sin agarrarlo, el recorrido no avanza.</small></span></div>
+                  <div><b>02</b><span><strong id="instruction-step-2-title">Busca el equilibrio</strong><small id="instruction-step-2-copy">Apoyo moderado: avanzas mejor; exceso: cuesta más.</small></span></div>
+                  <div><b>03</b><span><strong id="instruction-step-3-title">Esquiva y pisa luz</strong><small id="instruction-step-3-copy">Evita conos y completa cada zona brillante.</small></span></div>
                 </div>
                 <div class="control-keys">
-                  <div><span class="key-icon">⌨</span><span><strong>Computador</strong><small>W/S avanza/retrocede · A/D lateral · ratón gira · C recentra · diagonales sin acelerar · Shift corre · E toma/suelta · P pausa · R reinicia</small></span></div>
-                  <div><span class="key-icon quest-icon">◉</span><span><strong>Meta Quest</strong><small>Joystick izquierdo: avanza, retrocede y muévete a los lados según hacia dónde miras · gira la cabeza naturalmente · L3 acelera · grip ajusta el apoyo · no hace falta caminar físicamente</small></span></div>
+                  <div><span class="key-icon">⌨</span><span><strong id="computer-instruction-title">Computador</strong><small id="computer-instruction-copy">W/S avanza/retrocede · A/D lateral · ratón gira · C recentra · diagonales sin acelerar · Shift corre · E toma/suelta · P pausa · R reinicia</small></span></div>
+                  <div><span class="key-icon quest-icon">◉</span><span><strong id="quest-instruction-title">Meta Quest</strong><small id="quest-instruction-copy">Joystick izquierdo: avanza, retrocede y muévete a los lados según hacia dónde miras · gira la cabeza naturalmente · L3 acelera · grip ajusta el apoyo · no hace falta caminar físicamente</small></span></div>
                 </div>
-                <button class="start-game-button" id="start-game" type="button">Entendido · preparar recorrido <span aria-hidden="true">→</span></button>
-                <p class="instruction-footnote">Después, toma el bastón con el gatillo en Quest o con E / el botón en computador.</p>
+                <button class="start-game-button" id="start-game" type="button"><span id="start-game-label">Entendido · preparar recorrido</span><span aria-hidden="true">→</span></button>
+                <button class="quiet-button mode-back-button" id="back-to-modes" type="button">Cambiar modo</button>
+                <p class="instruction-footnote" id="instruction-footnote">Después, toma el bastón con el gatillo en Quest o con E / el botón en computador.</p>
               </div>
             </div>
 
             <div class="screen-overlay" id="pause-screen" role="dialog" aria-modal="true" aria-labelledby="pause-title" hidden>
               <div class="pause-card">
-                <span class="game-kicker"><span></span>RECORRIDO EN PAUSA</span>
+                <span class="game-kicker"><span></span><span id="pause-kicker">RECORRIDO EN PAUSA</span></span>
                 <h2 id="pause-title">Tómate un respiro.</h2>
                 <p>El tiempo y la estamina quedan en pausa.</p>
                 <div class="pause-actions"><button class="start-game-button" id="resume-game" type="button">Continuar <span aria-hidden="true">→</span></button><button class="quiet-button" id="reset-from-pause" type="button">Reiniciar recorrido</button></div>
@@ -128,14 +150,14 @@
             <div class="screen-overlay" id="finish-screen" role="dialog" aria-modal="true" aria-labelledby="finish-title" hidden>
               <div class="finish-card">
                 <div class="finish-medal" aria-hidden="true"><svg viewBox="0 0 44 44" fill="none"><circle cx="22" cy="22" r="19" stroke="currentColor" stroke-opacity=".28"/><path d="m13 22 6 6 12-13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-                <span class="game-kicker"><span></span>RECORRIDO COMPLETADO</span>
+                <span class="game-kicker"><span></span><span id="finish-kicker">RECORRIDO COMPLETADO</span></span>
                 <h2 id="finish-title">Llegaste a la meta.</h2>
-                <p>Buen ritmo. Aquí tienes el resumen de esta partida.</p>
+                <p id="finish-summary">Buen ritmo. Aquí tienes el resumen de esta partida.</p>
                 <div class="finish-stats">
                   <div><small>TIEMPO</small><strong id="final-time">00:00</strong></div>
-                  <div><small>PUNTOS</small><strong id="final-score">0</strong></div>
-                  <div><small>OBSTÁCULOS EVITADOS</small><strong id="final-obstacles">0 / 7</strong></div>
-                  <div><small>ZONAS COMPLETADAS</small><strong id="final-zones">0 / 7</strong></div>
+                  <div><small id="final-score-label">PUNTOS</small><strong id="final-score">0</strong></div>
+                  <div><small id="final-obstacles-label">OBSTÁCULOS EVITADOS</small><strong id="final-obstacles">0 / 7</strong></div>
+                  <div><small id="final-zones-label">ZONAS COMPLETADAS</small><strong id="final-zones">0 / 7</strong></div>
                 </div>
                 <div class="finish-actions">
                   <button class="start-game-button" id="replay-game" type="button">Jugar de nuevo <span aria-hidden="true">↻</span></button>
@@ -147,9 +169,9 @@
 
             <div class="screen-overlay" id="reset-choice-screen" role="dialog" aria-modal="true" aria-labelledby="reset-choice-title" hidden>
               <div class="pause-card reset-choice-card">
-                <span class="game-kicker"><span></span>RECORRIDO REINICIADO</span>
+                <span class="game-kicker"><span></span><span id="reset-choice-kicker">RECORRIDO REINICIADO</span></span>
                 <h2 id="reset-choice-title">¿Qué quieres hacer ahora?</h2>
-                <p>El tiempo, los puntos y la estamina del juego se reiniciaron.</p>
+                <p id="reset-choice-description">El tiempo, los puntos y la estamina del juego se reiniciaron.</p>
                 <div class="pause-actions">
                   <button class="start-game-button" id="reset-play-again" type="button">Jugar de nuevo <span aria-hidden="true">→</span></button>
                   <button class="quiet-button" id="reset-return-product" type="button">Volver a ver el bastón</button>
@@ -183,7 +205,7 @@
               <p class="stage-goal" id="stage-goal">Toma el bastón y pisa las dos zonas iluminadas.</p>
               <div class="stage-progress-meta"><span>Objetivo del tramo</span><b id="stage-progress-text">0 / 2 zonas</b></div>
               <div class="stage-progress-bar"><i id="stage-progress-bar"></i></div>
-              <div class="stage-steps" aria-label="Progreso de tramos">
+              <div class="stage-steps" id="stage-steps" aria-label="Progreso de tramos">
                 <div class="stage-step is-current" data-stage="0"><span>01</span><small>Agarre</small></div>
                 <i></i>
                 <div class="stage-step" data-stage="1"><span>02</span><small>Esquiva</small></div>
@@ -192,14 +214,29 @@
               </div>
             </div>
 
+            <section class="dynamic-controls-card" id="dynamic-controls-card" aria-labelledby="dynamic-controls-title" hidden>
+              <div class="dynamic-controls-heading"><span><span class="section-kicker">PISTA · 3 CARRILES</span><strong id="dynamic-controls-title">Control del recorrido</strong></span><span class="dynamic-lane-pill">Carril <b id="dynamic-lane-value">central</b></span></div>
+              <p class="dynamic-touch-hint" id="dynamic-touch-hint">Toca T o el botón cuando la punta del bastón coincida con una marca brillante.</p>
+              <div class="dynamic-lane-controls" role="group" aria-label="Cambiar de carril">
+                <button id="dynamic-lane-left" type="button" aria-label="Cambiar al carril izquierdo">← <span>Izquierda</span></button>
+                <button id="dynamic-lane-right" type="button" aria-label="Cambiar al carril derecho"><span>Derecha</span> →</button>
+              </div>
+              <div class="dynamic-action-controls">
+                <button class="dynamic-action-button dynamic-touch-button" id="dynamic-touch" type="button" disabled>Toque virtual <kbd>T</kbd></button>
+                <button class="dynamic-action-button" id="dynamic-pace" type="button">Ritmo: moderado</button>
+                <button class="dynamic-action-button dynamic-pause-button" id="dynamic-pause-control" type="button" disabled>Pausa inmediata</button>
+              </div>
+              <small class="dynamic-touch-status" id="dynamic-touch-status" aria-live="polite">Agarra el bastón para iniciar. No golpees el suelo real: el contacto es virtual.</small>
+            </section>
+
             <div class="score-grid">
-              <div class="score-tile"><span class="tile-label">PUNTOS</span><strong id="score-value">0</strong><small>+25 por zona · +8 por obstáculo evitado</small></div>
+              <div class="score-tile"><span class="tile-label" id="score-label">PUNTOS</span><strong id="score-value">0</strong><small id="score-note">+25 por zona · +8 por obstáculo evitado</small></div>
               <div class="score-tile"><span class="tile-label">TIEMPO</span><strong id="timer-value">00:00</strong><small>Ritmo moderado recomendado</small></div>
-              <div class="mini-stat"><span class="mini-stat-icon target-icon">◎</span><span><strong id="zones-value">0 / 7</strong><small>Zonas objetivo</small></span></div>
-              <div class="mini-stat"><span class="mini-stat-icon obstacle-icon">⌁</span><span><strong id="obstacles-value">0 / 7</strong><small>Obstáculos evitados</small></span></div>
+              <div class="mini-stat"><span class="mini-stat-icon target-icon">◎</span><span><strong id="zones-value">0 / 7</strong><small id="zones-label">Zonas objetivo</small></span></div>
+              <div class="mini-stat"><span class="mini-stat-icon obstacle-icon">⌁</span><span><strong id="obstacles-value">0 / 7</strong><small id="obstacles-label">Obstáculos evitados</small></span></div>
             </div>
 
-            <section class="sim-card support-card" aria-labelledby="support-title">
+            <section class="sim-card support-card" id="support-card" aria-labelledby="support-title">
               <div class="sim-card-heading"><div><span class="section-kicker">CONTROL DEL JUEGO</span><h3 id="support-title">Fuerza de apoyo</h3></div><span class="simulated-tag"><span></span>SIMULADO</span></div>
               <div class="support-reading"><strong><span id="support-value">45</span><small>%</small></strong><span class="support-status" id="support-status">Apoyo moderado</span></div>
               <div class="support-meter"><i id="support-meter"></i><span></span></div>
@@ -234,7 +271,7 @@
               </div>
             </section>
 
-            <section class="computer-controls" aria-label="Controles para computador">
+            <section class="computer-controls" id="computer-controls" aria-label="Controles para computador">
               <div class="control-heading"><span class="section-kicker">CONTROLES · COMPUTADOR</span><span class="control-mouse-note">teclado o ratón</span></div>
               <div class="dpad" role="group" aria-label="Movimiento del personaje">
                 <button class="dpad-button dpad-up" data-move="forward" type="button" aria-label="Avanzar">↑</button>
@@ -247,7 +284,7 @@
             </section>
 
             <button class="panel-return-button" id="return-product-from-game" type="button">Volver a ver el bastón</button>
-            <label class="comfort-card" for="comfort-toggle">
+            <label class="comfort-card" id="comfort-card" for="comfort-toggle">
               <span class="comfort-mark" aria-hidden="true">◉</span>
               <span><strong>Desplazamiento cómodo</strong><small>Menos velocidad y viñeta suave en VR.</small></span>
               <input id="comfort-toggle" type="checkbox" checked />

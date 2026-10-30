@@ -16,6 +16,21 @@ import {
   stepGame,
   togglePause,
 } from './game-engine.js';
+import {
+  DYNAMIC_MARKERS,
+  DYNAMIC_OBSTACLES,
+  DYNAMIC_TRACK,
+  attemptNearestDynamicMarkerTouch,
+  changeDynamicLane,
+  createDynamicTrackState,
+  grabDynamicCane,
+  laneName,
+  laneToX,
+  releaseDynamicCane,
+  setDynamicPace,
+  stepDynamicTrack,
+  toggleDynamicPause,
+} from './dynamic-track-engine.js';
 import { keyboardAction, movementRelativeToView, readKeyboardInput, readXRInputSources } from './input-mapping.js';
 import { translateCameraWithPlayer } from './camera-follow.js';
 import './style.css';
@@ -47,13 +62,23 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const fmt = new Intl.NumberFormat('es-CO');
 
 let gameState = createGameState();
+let dynamicState = createDynamicTrackState();
 let appMode = 'product';
+let gameMode = 'free';
 let scene;
 let camera;
 let renderer;
 let controls;
 let worldGroup;
 let courseGroup;
+let dynamicTrackGroup;
+let dynamicSegmentVisuals = [];
+let dynamicMarkerVisuals = [];
+let dynamicObstacleVisuals = [];
+let dynamicStartGate;
+let dynamicFinishGate;
+let dynamicStartLine;
+let dynamicFinishLine;
 let productPlatform;
 let playerAvatar;
 let avatarHead;
@@ -72,6 +97,7 @@ let toastTimeout = 0;
 let lastNoCaneToast = 0;
 let soundContext = null;
 let comfortEnabled = true;
+let webXRAvailability = 'checking';
 let vrHud;
 let vrHudTexture;
 let vrHudContext;
@@ -83,13 +109,16 @@ let lastWorldBoardSignature = '';
 let comfortMask;
 let fallDemoState = 'idle';
 let fallDemoPausedRun = false;
+let fallDemoPausedDynamic = false;
+let previousDynamicLaneDirection = 0;
+let comfortBeforeDynamicXR = true;
 let zoneVisuals = [];
 let obstacleVisuals = [];
 const modelMeshes = [];
 const pressedKeys = new Set();
 const mouseMove = { forward: false, back: false, left: false, right: false, sprint: false };
 const controllers = [];
-const previousXRButtons = { pause: false, restart: false };
+const previousXRButtons = { pause: false, restart: false, pace: false };
 const raycaster = new THREE.Raycaster();
 const rayMatrix = new THREE.Matrix4();
 const rayOrigin = new THREE.Vector3();
@@ -103,6 +132,24 @@ function setXRMessage(buttonText, note, guideText, disabled = true) {
   xrButtonLabel.textContent = buttonText;
   xrSupportNote.textContent = note;
   xrGuideText.textContent = guideText;
+}
+
+function updateXRMessageForMode() {
+  if (webXRAvailability === 'checking') {
+    setXRMessage('Comprobando WebXR', 'Consultando compatibilidad con Meta Quest…', 'El mismo recorrido también está disponible en computador.', true);
+    return;
+  }
+  if (webXRAvailability === 'unsupported') {
+    setXRMessage('WebXR no disponible', 'Este navegador no ofrece WebXR inmersivo.', gameMode === 'dynamic'
+      ? 'Pista dinámica: ritmo moderado, pausa inmediata y contacto virtual sin golpear el suelo.'
+      : 'En computador: W/S, A/D y cámara manual; Recorrido libre sigue siendo la experiencia principal.', true);
+    return;
+  }
+  if (gameMode === 'dynamic') {
+    setXRMessage('Entrar en Pista dinámica · Quest', 'Ritmo moderado · L3 lo reduce · pausa A/X inmediata · cámara estable.', 'Joystick izquierdo cambia de carril · L3 alterna ritmo suave. Sujeta el bastón; con el mismo mando usa el otro control para tocar una marca virtual. No golpees el suelo real.', false);
+  } else {
+    setXRMessage('Entrar en Meta Quest', 'Joystick izquierdo: muévete según el giro horizontal del visor. La cabeza conserva su seguimiento natural; no necesitas caminar físicamente.', 'Quest: joystick izquierdo según hacia dónde miras; L3 acelera; gatillo sujeta; grip ajusta apoyo.', false);
+  }
 }
 
 function showViewerError(title, message) {
@@ -166,6 +213,11 @@ function setupThree() {
   courseGroup.visible = false;
   worldGroup.add(courseGroup);
   buildCourse();
+  dynamicTrackGroup = new THREE.Group();
+  dynamicTrackGroup.name = 'Pista dinámica de tres carriles';
+  dynamicTrackGroup.visible = false;
+  worldGroup.add(dynamicTrackGroup);
+  buildDynamicTrack();
   createProductPlatform();
   createPlayer();
   createCaneStand();
@@ -333,6 +385,147 @@ function buildCourse() {
 
   createTargets();
   createObstacles();
+}
+
+function makeDynamicGate(distance, title, subtitle, { finish = false } = {}) {
+  const group = new THREE.Group();
+  group.userData.distance = distance;
+  const material = new THREE.MeshStandardMaterial({
+    color: finish ? 0x6c6840 : 0x263b2e,
+    metalness: 0.48,
+    roughness: 0.34,
+    emissive: finish ? 0x4b3b17 : 0x0d2013,
+    emissiveIntensity: finish ? 0.52 : 0.38,
+  });
+  createBasicBox(group, [0.09, 2.05, 0.11], [-1.9, 1.02, 0], material);
+  createBasicBox(group, [0.09, 2.05, 0.11], [1.9, 1.02, 0], material);
+  createBasicBox(group, [3.9, 0.11, 0.12], [0, 2.03, 0], material);
+  const texture = createLabelTexture(title, subtitle, finish ? '#e9cb8e' : '#a9dfb2');
+  const label = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.65, 0.47),
+    new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide, toneMapped: false })
+  );
+  label.position.set(0, 1.63, 0.07);
+  group.add(label);
+  dynamicTrackGroup.add(group);
+  return group;
+}
+
+function buildDynamicTrack() {
+  const roadMaterial = new THREE.MeshStandardMaterial({ color: 0x17251c, roughness: 0.86, metalness: 0.06 });
+  const edgeMaterial = new THREE.MeshBasicMaterial({ color: 0x83b98e, transparent: true, opacity: 0.58 });
+  const laneMaterial = new THREE.MeshBasicMaterial({ color: 0x99b89a, transparent: true, opacity: 0.27 });
+  const segmentCount = 11;
+  const segmentLength = DYNAMIC_TRACK.segmentLength;
+  dynamicSegmentVisuals = [];
+
+  for (let index = 0; index < segmentCount; index += 1) {
+    const segment = new THREE.Group();
+    const road = new THREE.Mesh(new THREE.PlaneGeometry(4.1, segmentLength), roadMaterial);
+    road.rotation.x = -Math.PI / 2;
+    road.position.y = -0.024;
+    road.receiveShadow = true;
+    segment.add(road);
+
+    [-1.93, 1.93].forEach((x) => {
+      const edge = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.014, segmentLength), edgeMaterial);
+      edge.position.set(x, 0.008, 0);
+      segment.add(edge);
+    });
+    [-0.575, 0.575].forEach((x) => {
+      for (let z = -0.75; z > -segmentLength; z -= 1.5) {
+        const dash = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.012, 0.58), laneMaterial);
+        dash.position.set(x, 0.009, z);
+        segment.add(dash);
+      }
+    });
+    dynamicTrackGroup.add(segment);
+    dynamicSegmentVisuals.push(segment);
+  }
+
+  dynamicMarkerVisuals = DYNAMIC_MARKERS.map((marker) => {
+    const group = new THREE.Group();
+    const glow = new THREE.Mesh(
+      new THREE.CircleGeometry(0.47, 40),
+      new THREE.MeshBasicMaterial({ color: 0x58d1b0, transparent: true, opacity: 0.24, depthWrite: false, side: THREE.DoubleSide })
+    );
+    glow.rotation.x = -Math.PI / 2;
+    glow.position.y = 0.012;
+    group.add(glow);
+
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.31, 0.025, 8, 40),
+      new THREE.MeshBasicMaterial({ color: 0x91f4d0, transparent: true, opacity: 0.94, depthWrite: false })
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.036;
+    group.add(ring);
+
+    const beaconStem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.018, 0.027, 0.48, 8),
+      new THREE.MeshBasicMaterial({ color: 0x7ad6b2, transparent: true, opacity: 0.7, depthWrite: false })
+    );
+    beaconStem.position.y = 0.28;
+    group.add(beaconStem);
+    const beacon = new THREE.Mesh(
+      new THREE.SphereGeometry(0.075, 12, 10),
+      new THREE.MeshBasicMaterial({ color: 0xb5ffe0, transparent: true, opacity: 0.92, depthWrite: false })
+    );
+    beacon.position.y = 0.55;
+    group.add(beacon);
+
+    group.position.x = laneToX(marker.lane);
+    group.userData = { id: marker.id, distance: marker.distance, ring, glow, beacon, collectedAt: null };
+    dynamicTrackGroup.add(group);
+    return group;
+  });
+
+  const obstacleMaterial = new THREE.MeshStandardMaterial({ color: 0xd98652, roughness: 0.48, metalness: 0.04, emissive: 0x4b2011, emissiveIntensity: 0.24 });
+  const stripeMaterial = new THREE.MeshStandardMaterial({ color: 0xf2e3c4, roughness: 0.55 });
+  dynamicObstacleVisuals = DYNAMIC_OBSTACLES.map((obstacle) => {
+    const group = new THREE.Group();
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.3, 0.07, 9), obstacleMaterial);
+    base.position.y = 0.04;
+    base.castShadow = true;
+    group.add(base);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.23, 0.58, 8), obstacleMaterial);
+    cone.position.y = 0.35;
+    cone.castShadow = true;
+    group.add(cone);
+    const stripe = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.055, 8), stripeMaterial);
+    stripe.position.y = 0.34;
+    group.add(stripe);
+    const halo = new THREE.Mesh(
+      new THREE.TorusGeometry(0.34, 0.012, 6, 28),
+      new THREE.MeshBasicMaterial({ color: 0xf0aa76, transparent: true, opacity: 0.62, depthWrite: false })
+    );
+    halo.rotation.x = Math.PI / 2;
+    halo.position.y = 0.018;
+    group.add(halo);
+    group.position.x = laneToX(obstacle.lane);
+    group.userData = { id: obstacle.id, distance: obstacle.distance, cone, halo };
+    dynamicTrackGroup.add(group);
+    return group;
+  });
+
+  dynamicStartLine = new THREE.Mesh(
+    new THREE.BoxGeometry(3.86, 0.018, 0.12),
+    new THREE.MeshBasicMaterial({ color: 0x8bd5a0, transparent: true, opacity: 0.92 })
+  );
+  dynamicStartLine.position.y = 0.017;
+  dynamicStartLine.userData.distance = 0;
+  dynamicTrackGroup.add(dynamicStartLine);
+
+  dynamicFinishLine = new THREE.Mesh(
+    new THREE.BoxGeometry(3.86, 0.025, 0.16),
+    new THREE.MeshBasicMaterial({ color: 0xe9cb8e, transparent: true, opacity: 0.98 })
+  );
+  dynamicFinishLine.position.y = 0.02;
+  dynamicFinishLine.userData.distance = DYNAMIC_TRACK.finishDistance;
+  dynamicTrackGroup.add(dynamicFinishLine);
+
+  dynamicStartGate = makeDynamicGate(1.5, 'INICIO', 'Agarra el bastón');
+  dynamicFinishGate = makeDynamicGate(DYNAMIC_TRACK.finishDistance, 'META', 'Pista completada', { finish: true });
 }
 
 function createProductPlatform() {
@@ -564,14 +757,15 @@ function setCourseCamera() {
 }
 
 function recenterCamera() {
-  if (!controls || renderer?.xr.isPresenting) return;
+  if (!controls || renderer?.xr.isPresenting || gameMode === 'dynamic') return;
   controls.enabled = true;
-  if (appMode === 'product') setProductCamera();
+  if (appMode === 'product' || appMode === 'mode-select') setProductCamera();
   else if (appMode === 'game' || appMode === 'instructions') setCourseCamera();
 }
 
 function activateProductPresentation() {
   if (courseGroup) courseGroup.visible = false;
+  if (dynamicTrackGroup) dynamicTrackGroup.visible = false;
   if (playerAvatar) playerAvatar.visible = false;
   if (worldBoard) worldBoard.visible = false;
   if (productPlatform) productPlatform.visible = true;
@@ -584,6 +778,7 @@ function activateProductPresentation() {
 
 function activateCoursePresentation() {
   if (courseGroup) courseGroup.visible = true;
+  if (dynamicTrackGroup) dynamicTrackGroup.visible = false;
   if (playerAvatar) playerAvatar.visible = true;
   if (productPlatform) productPlatform.visible = true;
   viewer.classList.remove('is-product-view');
@@ -591,6 +786,27 @@ function activateCoursePresentation() {
     controls.enabled = true;
     setCourseCamera();
   }
+}
+
+function activateDynamicPresentation({ setDesktopView = true } = {}) {
+  if (courseGroup) courseGroup.visible = false;
+  if (dynamicTrackGroup) dynamicTrackGroup.visible = true;
+  if (playerAvatar) playerAvatar.visible = true;
+  if (productPlatform) productPlatform.visible = false;
+  viewer.classList.remove('is-product-view');
+  if (worldGroup) worldGroup.position.set(0, 0, 0);
+  if (controls && !renderer?.xr.isPresenting && setDesktopView) {
+    controls.enabled = false;
+    controls.enableDamping = false;
+    controls.minDistance = 0.1;
+    controls.maxDistance = 24;
+    controls.minPolarAngle = 0.05;
+    controls.maxPolarAngle = Math.PI * 0.49;
+    camera.position.set(0.05, 2.35, 5.7);
+    controls.target.set(0, 0.82, -6.5);
+    controls.update();
+  }
+  updateDynamicScene();
 }
 
 function createWorldBoard() {
@@ -660,6 +876,52 @@ function paintXRHud() {
   ctx.strokeStyle = 'rgba(165, 218, 171, .5)';
   ctx.lineWidth = 3;
   ctx.strokeRect(6, 6, 500, 308);
+  if (gameMode === 'dynamic') {
+    const progress = Math.round((dynamicState.distance / DYNAMIC_TRACK.finishDistance) * 100);
+    const remaining = Math.max(0, Math.ceil(DYNAMIC_TRACK.finishDistance - dynamicState.distance));
+    ctx.font = '700 23px system-ui, sans-serif';
+    ctx.fillStyle = '#a8dcb0';
+    ctx.fillText('PISTA · 3 CARRILES', 28, 42);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#e8f2e7';
+    ctx.fillText(`${progress}%`, 480, 42);
+    ctx.textAlign = 'left';
+    ctx.font = '700 27px system-ui, sans-serif';
+    ctx.fillStyle = '#eef4e9';
+    ctx.fillText(`${remaining} m hasta la meta`, 28, 82);
+    ctx.font = '500 18px system-ui, sans-serif';
+    ctx.fillStyle = '#c1d0c1';
+    const contactInstruction = activeGripKind === 'trigger' ? 'Pulsa grip en el mismo mando para tocar.' : 'Pulsa gatillo en el mismo mando para tocar.';
+    const nextMarker = DYNAMIC_MARKERS.find((marker) => (
+      !dynamicState.markersCompleted.includes(marker.id) && marker.distance >= dynamicState.distance - 0.2
+    ));
+    const markerNear = nextMarker && nextMarker.distance - dynamicState.distance < 2.6;
+    const instruction = dynamicState.phase === 'paused'
+      ? 'Pista en pausa · A / X para continuar.'
+      : dynamicState.phase === 'finished'
+        ? 'Meta alcanzada · A / X para volver a jugar.'
+        : !dynamicState.caneHeld
+          ? 'Agarra el bastón para iniciar o reanudar.'
+          : markerNear
+            ? `Marca cerca · ${contactInstruction}`
+            : `${contactInstruction} No golpees el suelo real.`;
+    ctx.fillText(instruction, 28, 117, 445);
+    ctx.fillStyle = '#233c2b';
+    ctx.fillRect(28, 139, 450, 12);
+    ctx.fillStyle = '#9ad6a4';
+    ctx.fillRect(28, 139, 450 * dynamicState.stamina / 100, 12);
+    ctx.font = '600 18px system-ui, sans-serif';
+    ctx.fillStyle = '#d8e4d7';
+    ctx.fillText(`ESTAMINA SIMULADA  ${Math.round(dynamicState.stamina)}%`, 28, 180);
+    ctx.fillText(`CARRIL ${laneName(dynamicState.lane).toUpperCase()}  ·  RITMO ${dynamicState.pace === 'slow' ? 'SUAVE' : 'MODERADO'}`, 28, 212);
+    ctx.fillStyle = '#a6b6a6';
+    ctx.font = '500 15px system-ui, sans-serif';
+    ctx.fillText(`MARCAS ${dynamicState.markersCompleted.length}/${DYNAMIC_MARKERS.length}  ·  ESQUIVADOS ${dynamicState.obstaclesAvoided}/${DYNAMIC_OBSTACLES.length}  ·  CHOQUES ${dynamicState.collisions}`, 28, 256);
+    ctx.fillText('Fuerza, latidos y respiración del personaje: simulados.', 28, 287);
+    vrHudTexture.needsUpdate = true;
+    return;
+  }
+
   const stage = GAME_ROUTE.stages[gameState.stageIndex];
   ctx.font = '700 23px system-ui, sans-serif';
   ctx.fillStyle = '#a8dcb0';
@@ -728,9 +990,15 @@ function addXRControllers() {
     controller.addEventListener('disconnected', () => {
       controller.userData.handedness = '';
     });
-    controller.addEventListener('selectstart', () => tryGrabWithController(controller, 'trigger'));
+    controller.addEventListener('selectstart', () => {
+      if (gameMode === 'dynamic' && controller === activeController && activeGripKind === 'grip') touchDynamicMarker();
+      else tryGrabWithController(controller, 'trigger');
+    });
     controller.addEventListener('selectend', () => releaseFromController(controller, 'trigger'));
-    controller.addEventListener('squeezestart', () => tryGrabWithController(controller, 'grip'));
+    controller.addEventListener('squeezestart', () => {
+      if (gameMode === 'dynamic' && controller === activeController && activeGripKind === 'trigger') touchDynamicMarker();
+      else tryGrabWithController(controller, 'grip');
+    });
     controller.addEventListener('squeezeend', () => releaseFromController(controller, 'grip'));
     scene.add(controller);
     controllers.push(controller);
@@ -818,7 +1086,42 @@ function loadCaneModel() {
   );
 }
 
+function grabDynamicForDesktop() {
+  if (!modelLoaded || appMode !== 'game' || ['paused', 'finished'].includes(dynamicState.phase)) return;
+  if (dynamicState.caneHeld) {
+    if (activeController) return;
+    releaseDynamicCaneToTrack();
+    return;
+  }
+  playerAvatar.attach(caneRoot);
+  caneRoot.position.set(0.3, 0.03, 0.05);
+  caneRoot.rotation.set(0, DEFAULT_YAW, 0);
+  grabDynamicCane(dynamicState);
+  setMessage('Bastón sujeto · la pista avanza a ritmo moderado.', 'good');
+  playFeedback('grab');
+  ensureAudio();
+  renderUI();
+}
+
+function releaseDynamicCaneToTrack() {
+  if (!dynamicState.caneHeld) return;
+  if (activeController) {
+    releaseFromController(activeController, activeGripKind);
+    return;
+  }
+  worldGroup.attach(caneRoot);
+  caneRoot.position.set(laneToX(dynamicState.lanePosition) + 0.3, PLATFORM_TOP, 0.12);
+  caneRoot.rotation.set(0, DEFAULT_YAW, 0);
+  releaseDynamicCane(dynamicState);
+  setMessage('Bastón suelto · la pista se detuvo. Agárralo para reanudar.', 'warning');
+  renderUI();
+}
+
 function grabForDesktop() {
+  if (gameMode === 'dynamic') {
+    grabDynamicForDesktop();
+    return;
+  }
   if (!modelLoaded || gameState.phase === 'instructions' || gameState.phase === 'paused' || gameState.phase === 'finished') return;
   if (gameState.caneHeld) {
     if (activeController) return;
@@ -836,6 +1139,10 @@ function grabForDesktop() {
 }
 
 function releaseCaneToCourse() {
+  if (gameMode === 'dynamic') {
+    releaseDynamicCaneToTrack();
+    return;
+  }
   if (!gameState.caneHeld) return;
   if (activeController) {
     releaseFromController(activeController, activeGripKind);
@@ -861,7 +1168,26 @@ function controllerRayHitsCane(controller) {
 }
 
 function tryGrabWithController(controller, gripKind) {
-  if (!renderer?.xr.isPresenting || !modelLoaded || gameState.phase === 'instructions' || gameState.phase === 'paused' || gameState.phase === 'finished' || gameState.caneHeld) return;
+  if (!renderer?.xr.isPresenting || !modelLoaded || appMode !== 'game') return;
+  if (gameMode === 'dynamic') {
+    if (dynamicState.phase === 'paused' || dynamicState.phase === 'finished' || dynamicState.caneHeld) return;
+    if (!controllerRayHitsCane(controller)) {
+      setMessage('Apunta el mando al bastón y mantén gatillo o grip.', 'warning');
+      return;
+    }
+    controller.attach(caneRoot);
+    caneRoot.position.set(0, -1.65 * MODEL_SCALE, -0.1);
+    caneRoot.rotation.set(0, 0, 0);
+    activeController = controller;
+    activeGripKind = gripKind;
+    grabDynamicCane(dynamicState);
+    setMessage('Bastón sujeto · la pista avanza a ritmo moderado.', 'good');
+    playFeedback('grab');
+    ensureAudio();
+    renderUI();
+    return;
+  }
+  if (gameState.phase === 'instructions' || gameState.phase === 'paused' || gameState.phase === 'finished' || gameState.caneHeld) return;
   if (!controllerRayHitsCane(controller)) {
     setMessage('Apunta el mando al bastón y mantén gatillo o grip.', 'warning');
     return;
@@ -878,7 +1204,20 @@ function tryGrabWithController(controller, gripKind) {
 }
 
 function releaseFromController(controller, gripKind) {
-  if (activeController !== controller || activeGripKind !== gripKind || !gameState.caneHeld) return;
+  if (activeController !== controller || activeGripKind !== gripKind) return;
+  if (gameMode === 'dynamic') {
+    if (!dynamicState.caneHeld) return;
+    worldGroup.attach(caneRoot);
+    caneRoot.position.set(laneToX(dynamicState.lanePosition) + 0.3, PLATFORM_TOP, 0.12);
+    caneRoot.rotation.set(0, DEFAULT_YAW, 0);
+    activeController = null;
+    activeGripKind = '';
+    releaseDynamicCane(dynamicState);
+    setMessage('Bastón suelto · la pista se detuvo. Agárralo para reanudar.', 'warning');
+    renderUI();
+    return;
+  }
+  if (!gameState.caneHeld) return;
   worldGroup.attach(caneRoot);
   caneRoot.position.set(gameState.player.x + 0.38, PLATFORM_TOP, gameState.player.z + 0.12);
   caneRoot.rotation.set(0, DEFAULT_YAW, 0);
@@ -944,6 +1283,10 @@ function playFeedback(type) {
   } else if (type === 'stage' || type === 'finish') {
     tone(type === 'finish' ? 740 : 520, 0.13, 'sine', 0.04);
     tone(type === 'finish' ? 990 : 720, 0.17, 'sine', 0.03, 0.1);
+  } else if (type === 'avoided') {
+    tone(490, 0.055, 'sine', 0.018);
+  } else if (type === 'lane') {
+    tone(340, 0.055, 'sine', 0.018);
   } else if (type === 'grab') {
     tone(410, 0.07, 'sine', 0.025);
   }
@@ -983,67 +1326,236 @@ function handleGameEvents(events) {
   }
 }
 
+function updateInstructionCopy() {
+  const isDynamic = gameMode === 'dynamic';
+  $('#instructions-kicker').textContent = isDynamic ? 'PISTA · PARTIDA CORTA' : 'ANTES DE EMPEZAR';
+  $('#instructions-title').childNodes[0].textContent = isDynamic ? 'Una pista. ' : 'Una ruta. ';
+  $('#instructions-title-em').textContent = isDynamic ? 'Tres carriles.' : 'Tu ritmo.';
+  $('#instructions-lead').textContent = isDynamic
+    ? 'Agarra el bastón para iniciar. Cambia de carril, esquiva conos y toca las marcas con la punta virtual. Pausa cuando quieras; no son mediciones.'
+    : 'Completa tres tramos hasta la meta. Todas las lecturas son simulaciones del juego, no mediciones.';
+  $('#instruction-step-1-title').textContent = isDynamic ? 'Agarra el bastón' : 'Toma el bastón';
+  $('#instruction-step-1-copy').textContent = isDynamic
+    ? 'Al agarrarlo, la pista avanza a ritmo moderado; al soltarlo, se detiene.'
+    : 'Sin agarrarlo, el recorrido no avanza.';
+  $('#instruction-step-2-title').textContent = isDynamic ? 'Cambia de carril' : 'Busca el equilibrio';
+  $('#instruction-step-2-copy').textContent = isDynamic
+    ? 'A/D o flechas · botones del panel · joystick izquierdo en Quest.'
+    : 'Apoyo moderado: avanzas mejor; exceso: cuesta más.';
+  $('#instruction-step-3-title').textContent = isDynamic ? 'Toca las marcas' : 'Esquiva y pisa luz';
+  $('#instruction-step-3-copy').textContent = isDynamic
+    ? 'T o clic con la contera alineada; en Quest, usa el otro control del mismo mando. Nunca golpees el suelo real.'
+    : 'Evita conos y completa cada zona brillante.';
+  $('#computer-instruction-title').textContent = isDynamic ? 'Computador' : 'Computador';
+  $('#computer-instruction-copy').textContent = isDynamic
+    ? 'A/D o ←/→ cambia un carril · T o clic toca solo si la contera virtual está alineada · E agarra/suelta · P pausa · R reinicia.'
+    : 'W/S avanza/retrocede · A/D lateral · ratón gira · C recentra · diagonales sin acelerar · Shift corre · E toma/suelta · P pausa · R reinicia';
+  $('#quest-instruction-title').textContent = 'Meta Quest';
+  $('#quest-instruction-copy').textContent = isDynamic
+    ? 'Joystick izquierdo cambia de carril · L3 alterna ritmo suave · sujeta con gatillo o grip · pulsa el otro control del mismo mando para tocar · A/X pausa · sin golpes al suelo.'
+    : 'Joystick izquierdo: avanza, retrocede y muévete a los lados según hacia dónde miras · gira la cabeza naturalmente · L3 acelera · grip ajusta el apoyo · no hace falta caminar físicamente';
+  $('#start-game-label').textContent = isDynamic ? 'Entendido · preparar pista' : 'Entendido · preparar recorrido';
+  $('#back-to-modes').textContent = 'Cambiar modo';
+  $('#instruction-footnote').textContent = isDynamic
+    ? 'En Quest, jugador y cámara permanecen estables; la pista se desplaza suavemente. El toque es virtual: no golpees el piso real.'
+    : 'Después, toma el bastón con el gatillo en Quest o con E / el botón en computador.';
+}
+
+function getDynamicObjectiveText() {
+  if (dynamicState.phase === 'ready') return 'Agarra el bastón para poner la pista en marcha.';
+  if (dynamicState.phase === 'paused') return 'Pista detenida. Reanuda cuando estés listo.';
+  if (dynamicState.phase === 'finished') return 'Meta alcanzada · partida corta completada.';
+  if (!dynamicState.caneHeld) return 'Bastón suelto · agárralo para seguir avanzando.';
+
+  const nextObstacle = DYNAMIC_OBSTACLES.find((obstacle) => (
+    dynamicState.obstacleResults[obstacle.id] === 'pending' && obstacle.distance >= dynamicState.distance
+  ));
+  const obstacleGap = nextObstacle ? nextObstacle.distance - dynamicState.distance : Infinity;
+  const nextMarker = DYNAMIC_MARKERS.find((marker) => (
+    !dynamicState.markersCompleted.includes(marker.id) && marker.distance >= dynamicState.distance - 0.2
+  ));
+  const markerGap = nextMarker ? nextMarker.distance - dynamicState.distance : Infinity;
+  if (nextObstacle && obstacleGap < 3.2) {
+    return `Próximo cono: carril ${laneName(nextObstacle.lane)}. Cambia de carril para esquivarlo.`;
+  }
+  if (nextMarker && markerGap < 2.4) {
+    return `Marca en carril ${laneName(nextMarker.lane)} · alinea la contera y toca T / el control virtual.`;
+  }
+  if (nextObstacle && obstacleGap < 7.5) {
+    return `Próximo cono: carril ${laneName(nextObstacle.lane)}. Cambia de carril para esquivarlo.`;
+  }
+  return 'Avanza a ritmo cómodo · esquiva conos y cambia entre los tres carriles.';
+}
+
+function handleDynamicEvents(events) {
+  for (const event of events) {
+    if (event.type === 'collision') {
+      setMessage('Colisión · −18 estamina por este obstáculo. Cambia de carril y reduce el ritmo.', 'warning', 2600);
+      playFeedback('collision');
+    } else if (event.type === 'avoided') {
+      setMessage('Bien esquivado · el carril quedó libre.', 'good', 1300);
+      playFeedback('avoided');
+    } else if (event.type === 'finish') {
+      setMessage('¡Meta alcanzada!', 'good', 3500);
+      playFeedback('finish');
+      showFinishScreen();
+    }
+  }
+}
+
+function moveDynamicLane(direction) {
+  if (gameMode !== 'dynamic' || appMode !== 'game') return;
+  const event = changeDynamicLane(dynamicState, direction);
+  if (event.type === 'lane-change') {
+    setMessage(`Carril ${laneName(event.lane)}. Mantén un ritmo cómodo.`, 'good', 1100);
+    playFeedback('lane');
+    renderUI();
+  }
+}
+
+function getDynamicCaneTipPosition() {
+  if (!caneRoot || !dynamicTrackGroup) return null;
+  caneRoot.updateWorldMatrix(true, true);
+  dynamicTrackGroup.updateWorldMatrix(true, false);
+  const tip = new THREE.Vector3().setFromMatrixPosition(caneRoot.matrixWorld);
+  dynamicTrackGroup.worldToLocal(tip);
+  return { x: tip.x, y: tip.y, z: tip.z };
+}
+
+function touchDynamicMarker() {
+  if (gameMode !== 'dynamic' || appMode !== 'game' || !dynamicState.caneHeld) {
+    setMessage('Agarra el bastón antes de tocar una marca.', 'warning', 1600);
+    return;
+  }
+  const result = attemptNearestDynamicMarkerTouch(dynamicState, getDynamicCaneTipPosition());
+  if (result.type === 'marker') {
+    const visual = dynamicMarkerVisuals.find((item) => item.userData.id === result.id);
+    if (visual) visual.userData.collectedAt = elapsedScene;
+    setMessage(`Marca activada · +${result.staminaChange} estamina.`, 'good', 1800);
+    playFeedback('zone');
+  } else if (result.type === 'touch-duplicate') {
+    setMessage('Esa marca ya se completó; no hay una bonificación extra.', 'warning', 1800);
+    tone(230, 0.08, 'triangle', 0.025);
+  } else {
+    setMessage('Toque fallido · alinea la contera con una marca visible y vuelve a tocar.', 'warning', 1800);
+    tone(260, 0.07, 'triangle', 0.025);
+  }
+  renderUI();
+}
+
 function renderUI() {
   const stage = GAME_ROUTE.stages[gameState.stageIndex] ?? GAME_ROUTE.stages.at(-1);
   const stageProgress = getCurrentStageZoneProgress(gameState);
-  const journey = Math.round(getJourneyProgress(gameState) * 100);
   const isProductView = appMode === 'product';
+  const isModeSelect = appMode === 'mode-select';
   const isInstructions = appMode === 'instructions';
   const isResetChoice = appMode === 'reset-choice';
+  const isDynamic = gameMode === 'dynamic';
+  const phase = isDynamic ? dynamicState.phase : gameState.phase;
+  const caneHeld = isDynamic ? dynamicState.caneHeld : gameState.caneHeld;
+  const journey = isDynamic
+    ? Math.round((dynamicState.distance / DYNAMIC_TRACK.finishDistance) * 100)
+    : Math.round(getJourneyProgress(gameState) * 100);
+  const isPlaying = phase === 'playing';
+  const isPaused = phase === 'paused';
+  const isFinished = phase === 'finished';
   const statusText = isProductView
     ? 'INSPECCIÓN 3D'
-    : isResetChoice
-      ? 'RECORRIDO REINICIADO'
-      : isInstructions
-        ? 'INSTRUCCIONES'
-        : gameState.phase === 'ready'
-          ? (gameState.caneHeld ? 'LISTO' : 'TOMA EL BASTÓN')
-          : gameState.phase === 'paused'
-            ? 'EN PAUSA'
-            : gameState.phase === 'finished'
-              ? 'EN LA META'
-              : gameState.caneHeld
-                ? 'RECORRIDO ACTIVO'
-                : 'BASTÓN SUELTO';
+    : isModeSelect
+      ? 'ELIGE MODO'
+      : isResetChoice
+        ? (isDynamic ? 'PISTA REINICIADA' : 'RECORRIDO REINICIADO')
+        : isInstructions
+          ? 'INSTRUCCIONES'
+          : isDynamic
+            ? phase === 'ready'
+              ? 'TOMA EL BASTÓN'
+              : phase === 'paused'
+                ? 'EN PAUSA'
+                : phase === 'finished'
+                  ? 'EN LA META'
+                  : caneHeld
+                    ? 'PISTA ACTIVA'
+                    : 'BASTÓN SUELTO'
+            : gameState.phase === 'ready'
+              ? (gameState.caneHeld ? 'LISTO' : 'TOMA EL BASTÓN')
+              : gameState.phase === 'paused'
+                ? 'EN PAUSA'
+                : gameState.phase === 'finished'
+                  ? 'EN LA META'
+                  : gameState.caneHeld
+                    ? 'RECORRIDO ACTIVO'
+                    : 'BASTÓN SUELTO';
   const panelStatus = $('#panel-status');
-  panelStatus.classList.toggle('is-playing', appMode === 'game' && gameState.phase === 'playing' && gameState.caneHeld);
-  panelStatus.classList.toggle('is-paused', appMode === 'game' && gameState.phase === 'paused');
-  panelStatus.classList.toggle('is-finished', appMode === 'game' && gameState.phase === 'finished');
-  $('#panel-status-text').textContent = appMode === 'game' && gameState.phase === 'playing' && !gameState.caneHeld ? 'AGARRA EL BASTÓN' : statusText;
+  panelStatus.classList.toggle('is-playing', appMode === 'game' && isPlaying && caneHeld);
+  panelStatus.classList.toggle('is-paused', appMode === 'game' && isPaused);
+  panelStatus.classList.toggle('is-finished', appMode === 'game' && isFinished);
+  $('#panel-status-text').textContent = appMode === 'game' && isPlaying && !caneHeld ? 'AGARRA EL BASTÓN' : statusText;
   $('#viewer-status').textContent = statusText;
-  $('#state-dot').classList.toggle('is-paused', appMode === 'game' && gameState.phase === 'paused');
-  $('#panel-kicker').textContent = isProductView ? 'MODELO INTERACTIVO' : 'TU RECORRIDO';
-  $('#stage-title').textContent = isProductView ? 'Vista del bastón' : stage.title;
+  $('#viewer-id-title').textContent = isProductView ? 'VISTA DEL BASTÓN' : isDynamic ? 'PISTA DINÁMICA' : 'RECORRIDO LIBRE';
+  $('#state-dot').classList.toggle('is-paused', appMode === 'game' && isPaused);
+  $('#panel-kicker').textContent = isProductView
+    ? 'MODELO INTERACTIVO'
+    : isModeSelect
+      ? 'ELIGE EXPERIENCIA'
+      : isDynamic
+        ? 'PISTA CORTA · 3 CARRILES'
+        : 'TU RECORRIDO';
+  $('#stage-title').textContent = isProductView ? 'Vista del bastón' : isDynamic ? 'Pista dinámica' : stage.title;
   $('#product-panel-card').hidden = !isProductView;
-  $('#game-panel-content').hidden = isProductView;
-  $('#route-markers').hidden = isProductView;
+  $('#game-panel-content').hidden = isProductView || isModeSelect;
+  $('#route-markers').hidden = isProductView || isModeSelect;
   $('#begin-route').hidden = !isProductView;
   $('#begin-route').disabled = !modelLoaded;
   $('#xr-wrap').hidden = appMode !== 'game';
   takeButton.hidden = appMode !== 'game';
   pauseButton.hidden = appMode !== 'game';
   $('#reset-button').hidden = appMode !== 'game';
-  $('#recenter-camera').hidden = !controls || appMode !== 'game' || Boolean(renderer?.xr.isPresenting);
-  $('#stage-number').textContent = `TRAMO ${String(gameState.stageIndex + 1).padStart(2, '0')} / 03`;
-  $('#stage-goal').textContent = !gameState.caneHeld && gameState.phase !== 'instructions'
-    ? 'Toma el bastón para desbloquear el movimiento; después completa las zonas de este tramo.'
-    : stage.goal;
-  $('#stage-progress-text').textContent = `${stageProgress.done} / ${stageProgress.total} zonas`;
-  $('#stage-progress-bar').style.width = `${stageProgress.total ? (stageProgress.done / stageProgress.total) * 100 : 0}%`;
-  $('#journey-progress-text').textContent = String(journey);
-  $('#journey-progress-bar').style.width = `${journey}%`;
-  $('#score-value').textContent = fmt.format(gameState.points);
-  $('#timer-value').textContent = formatTime(gameState.elapsed);
-  $('#zones-value').textContent = `${gameState.zonesCompleted} / ${GAME_ROUTE.zones.length}`;
-  $('#obstacles-value').textContent = `${gameState.obstaclesAvoided} / ${GAME_ROUTE.obstacles.length}`;
+  $('#recenter-camera').hidden = !controls || appMode !== 'game' || isDynamic || Boolean(renderer?.xr.isPresenting);
+  $('#mode-select-screen').hidden = !isModeSelect;
+  $('#stage-steps').hidden = isDynamic;
+  $('#dynamic-controls-card').hidden = !isDynamic;
+  $('#computer-controls').hidden = isDynamic;
+  $('#support-card').hidden = isDynamic;
+  $('#stage-number').textContent = isDynamic ? 'PISTA · 3 CARRILES' : `TRAMO ${String(gameState.stageIndex + 1).padStart(2, '0')} / 03`;
+  $('#stage-goal').textContent = isDynamic
+    ? getDynamicObjectiveText()
+    : !gameState.caneHeld && gameState.phase !== 'instructions'
+      ? 'Toma el bastón para desbloquear el movimiento; después completa las zonas de este tramo.'
+      : stage.goal;
+  const stageDone = isDynamic ? dynamicState.markersCompleted.length : stageProgress.done;
+  const stageTotal = isDynamic ? DYNAMIC_MARKERS.length : stageProgress.total;
+  $('#stage-progress-text').textContent = isDynamic
+    ? `${stageDone} / ${stageTotal} marcas tocadas`
+    : `${stageDone} / ${stageTotal} zonas`;
+  $('#stage-progress-bar').style.width = `${stageTotal ? (stageDone / stageTotal) * 100 : 0}%`;
+  $('#journey-progress-text').textContent = String(clamp(journey, 0, 100));
+  $('#journey-progress-bar').style.width = `${clamp(journey, 0, 100)}%`;
+  $('#score-label').textContent = isDynamic ? 'HASTA LA META' : 'PUNTOS';
+  $('#score-value').textContent = isDynamic
+    ? `${Math.max(0, Math.ceil(DYNAMIC_TRACK.finishDistance - dynamicState.distance))} m`
+    : fmt.format(gameState.points);
+  $('#score-note').textContent = isDynamic ? `${DYNAMIC_TRACK.finishDistance} m · ritmo ${dynamicState.pace === 'slow' ? 'suave' : 'moderado'}` : '+25 por zona · +8 por obstáculo evitado';
+  $('#timer-value').textContent = formatTime(isDynamic ? dynamicState.elapsed : gameState.elapsed);
+  $('#zones-value').textContent = isDynamic
+    ? `${dynamicState.markersCompleted.length} / ${DYNAMIC_MARKERS.length}`
+    : `${gameState.zonesCompleted} / ${GAME_ROUTE.zones.length}`;
+  $('#zones-label').textContent = isDynamic ? 'Marcas tocadas · +9 estamina' : 'Zonas objetivo';
+  $('#obstacles-value').textContent = isDynamic
+    ? `${dynamicState.obstaclesAvoided} / ${DYNAMIC_OBSTACLES.length}`
+    : `${gameState.obstaclesAvoided} / ${GAME_ROUTE.obstacles.length}`;
+  $('#obstacles-label').textContent = isDynamic
+    ? `Esquivados · ${dynamicState.collisions} colisiones (−18 c/u)`
+    : 'Obstáculos evitados';
   $('#support-value').textContent = String(Math.round(gameState.support * 100));
   $('#support-meter').style.left = `${gameState.support * 100}%`;
   if (document.activeElement !== supportSlider) supportSlider.value = String(Math.round(gameState.support * 100));
   $('#heart-rate').textContent = String(gameState.heartRate);
   $('#breathing-rate').textContent = String(gameState.breathingRate);
-  $('#stamina-value').textContent = String(Math.round(gameState.stamina));
-  $('#stamina-bar').style.width = `${gameState.stamina}%`;
-  $('#stamina-bar').classList.toggle('is-low', gameState.stamina < 28);
+  const stamina = isDynamic ? dynamicState.stamina : gameState.stamina;
+  $('#stamina-value').textContent = String(Math.round(stamina));
+  $('#stamina-bar').style.width = `${stamina}%`;
+  $('#stamina-bar').classList.toggle('is-low', stamina < 28);
 
   const supportStatus = $('#support-status');
   supportStatus.classList.toggle('is-high', gameState.support > 0.72);
@@ -1060,38 +1572,98 @@ function renderUI() {
     : gameState.support < 0.25
       ? 'Un apoyo muy bajo hace más difícil mantener el equilibrio.'
       : 'Mantén el indicador en la zona verde para avanzar con equilibrio.';
-  $('#effort-title').textContent = `Esfuerzo ${gameState.effort > 0.66 ? 'alto' : gameState.effort > 0.33 ? 'moderado' : 'suave'}`;
+  $('#effort-title').textContent = isDynamic
+    ? 'Ritmo del personaje'
+    : `Esfuerzo ${gameState.effort > 0.66 ? 'alto' : gameState.effort > 0.33 ? 'moderado' : 'suave'}`;
   document.querySelectorAll('.stage-step').forEach((step) => {
     const index = Number(step.dataset.stage);
-    step.classList.toggle('is-current', index === gameState.stageIndex && gameState.phase !== 'finished');
-    step.classList.toggle('is-done', index < gameState.stageIndex || gameState.phase === 'finished');
+    step.classList.toggle('is-current', !isDynamic && index === gameState.stageIndex && gameState.phase !== 'finished');
+    step.classList.toggle('is-done', !isDynamic && (index < gameState.stageIndex || gameState.phase === 'finished'));
   });
 
-  const isPlaying = gameState.phase === 'playing';
-  takeButton.disabled = !modelLoaded || gameState.phase === 'instructions' || gameState.phase === 'paused' || gameState.phase === 'finished' || Boolean(activeController);
-  takeButton.classList.toggle('is-held', gameState.caneHeld);
-  $('#take-button-label').textContent = gameState.caneHeld ? 'Soltar bastón' : 'Tomar bastón';
-  pauseButton.disabled = !isPlaying;
-  pauseButton.setAttribute('aria-label', gameState.phase === 'paused' ? 'Reanudar recorrido' : 'Pausar recorrido');
-  $('#pause-screen').hidden = appMode !== 'game' || gameState.phase !== 'paused' || fallDemoState !== 'idle';
-  $('#finish-screen').hidden = appMode !== 'game' || gameState.phase !== 'finished';
-  $('#instructions-screen').hidden = appMode !== 'instructions';
-  $('#reset-choice-screen').hidden = appMode !== 'reset-choice';
+  $('#dynamic-lane-value').textContent = laneName(dynamicState.lane);
+  $('#dynamic-touch').disabled = !isDynamic || appMode !== 'game' || !isPlaying || !dynamicState.caneHeld || Boolean(activeController);
+  $('#dynamic-pause-control').disabled = !isDynamic || !['playing', 'paused'].includes(dynamicState.phase);
+  $('#dynamic-pause-control').textContent = dynamicState.phase === 'paused' ? 'Reanudar pista' : 'Pausa inmediata';
+  $('#dynamic-pace').textContent = `Ritmo: ${dynamicState.pace === 'slow' ? 'suave' : 'moderado'}`;
+  $('#dynamic-lane-left').disabled = !isDynamic || appMode !== 'game' || !isPlaying || !dynamicState.caneHeld || dynamicState.lane === 0;
+  $('#dynamic-lane-right').disabled = !isDynamic || appMode !== 'game' || !isPlaying || !dynamicState.caneHeld || dynamicState.lane === 2;
+  $('#dynamic-touch-hint').textContent = isDynamic && renderer?.xr.isPresenting
+    ? !dynamicState.caneHeld
+      ? 'Quest · sujeta el bastón con gatillo o grip. No golpees el suelo real.'
+      : activeGripKind === 'trigger'
+        ? 'Quest · pulsa grip en el mismo mando cuando la contera esté alineada.'
+        : 'Quest · pulsa gatillo en el mismo mando cuando la contera esté alineada.'
+    : 'Computador · pulsa T o el botón cuando la punta del bastón esté alineada con una marca.';
+  $('#dynamic-touch-status').textContent = isDynamic && !dynamicState.caneHeld
+    ? 'Agarra el bastón para iniciar. El toque es virtual; no golpees el suelo real.'
+    : isDynamic && renderer?.xr.isPresenting
+      ? 'El otro control del mando que sostiene el bastón realiza un toque virtual.'
+      : 'El toque requiere una acción individual y alineación de la contera; caminar sobre una marca no la activa.';
+
+  const isImmersive = Boolean(renderer?.xr.isPresenting);
+  $('#comfort-card').hidden = isDynamic && !isImmersive;
+  if (isDynamic && isImmersive) {
+    comfortEnabled = true;
+    comfortToggle.checked = true;
+  }
+  comfortToggle.disabled = isDynamic && isImmersive;
+  const canTake = isDynamic
+    ? modelLoaded && appMode === 'game' && !['paused', 'finished'].includes(dynamicState.phase) && !activeController
+    : modelLoaded && gameState.phase !== 'instructions' && gameState.phase !== 'paused' && gameState.phase !== 'finished' && !activeController;
+  takeButton.disabled = !canTake;
+  takeButton.classList.toggle('is-held', caneHeld);
+  $('#take-button-label').textContent = caneHeld ? 'Soltar bastón' : 'Tomar bastón';
+  pauseButton.disabled = isDynamic ? !['playing', 'paused'].includes(dynamicState.phase) : !isPlaying;
+  pauseButton.setAttribute('aria-label', isPaused ? `Reanudar ${isDynamic ? 'pista' : 'recorrido'}` : `Pausar ${isDynamic ? 'pista' : 'recorrido'}`);
+  $('#pause-kicker').textContent = isDynamic ? 'PISTA EN PAUSA' : 'RECORRIDO EN PAUSA';
+  $('#finish-kicker').textContent = isDynamic ? 'PISTA COMPLETADA' : 'RECORRIDO COMPLETADO';
+  $('#finish-summary').textContent = isDynamic
+    ? 'Partida corta completada. Aquí tienes el resumen de la pista.'
+    : 'Buen ritmo. Aquí tienes el resumen de esta partida.';
+  $('#final-score-label').textContent = isDynamic ? 'DISTANCIA' : 'PUNTOS';
+  $('#final-obstacles-label').textContent = isDynamic ? 'ESQUIVADOS · COLISIONES' : 'OBSTÁCULOS EVITADOS';
+  $('#final-zones-label').textContent = isDynamic ? 'MARCAS COMPLETADAS' : 'ZONAS COMPLETADAS';
+  $('#reset-choice-kicker').textContent = isDynamic ? 'PISTA REINICIADA' : 'RECORRIDO REINICIADO';
+  $('#reset-choice-description').textContent = isDynamic
+    ? 'El avance, las marcas y la estamina simulada de la pista se reiniciaron.'
+    : 'El tiempo, los puntos y la estamina del juego se reiniciaron.';
+  $('#pause-screen').hidden = appMode !== 'game' || !isPaused || fallDemoState !== 'idle';
+  $('#finish-screen').hidden = appMode !== 'game' || !isFinished;
+  $('#instructions-screen').hidden = !isInstructions;
+  $('#reset-choice-screen').hidden = !isResetChoice;
   $('#return-product-from-game').hidden = appMode !== 'game';
   $('#canvas-objective').textContent = isProductView
     ? 'Arrastra para girar · rueda para acercar'
-    : isInstructions
-      ? 'Lee las instrucciones y prepara el recorrido'
-      : gameState.phase === 'ready' || !gameState.caneHeld
-        ? 'Sin bastón no puedes avanzar'
-        : gameState.phase === 'finished'
-          ? 'Recorrido completo · puedes volver a jugar'
-          : stage.goal;
+    : isModeSelect
+      ? 'Elige Recorrido libre o Pista dinámica'
+      : isInstructions
+        ? 'Lee las instrucciones y prepara el recorrido'
+        : isDynamic
+          ? dynamicState.phase === 'finished'
+            ? 'Meta alcanzada · pista corta completada'
+            : dynamicState.phase === 'paused'
+              ? 'Pista pausada · continúa cuando estés listo'
+              : dynamicState.phase === 'ready'
+                ? 'Agarra el bastón para empezar'
+                : !dynamicState.caneHeld
+                  ? 'Bastón suelto · la pista está detenida'
+                  : getDynamicObjectiveText()
+          : gameState.phase === 'ready' || !gameState.caneHeld
+            ? 'Sin bastón no puedes avanzar'
+            : gameState.phase === 'finished'
+              ? 'Recorrido completo · puedes volver a jugar'
+              : stage.goal;
   $('#canvas-objective-label').textContent = isProductView
     ? 'INSPECCIÓN DEL MODELO 3D'
-    : gameState.phase === 'finished'
-      ? 'META'
-      : `TRAMO ${String(gameState.stageIndex + 1).padStart(2, '0')} · OBJETIVO`;
+    : isModeSelect
+      ? 'ELIGE TU EXPERIENCIA'
+      : isDynamic
+        ? dynamicState.phase === 'finished' ? 'META' : 'PISTA DINÁMICA'
+        : gameState.phase === 'finished'
+          ? 'META'
+          : `TRAMO ${String(gameState.stageIndex + 1).padStart(2, '0')} · OBJETIVO`;
+  updateInstructionCopy();
   updateFallDemoUI();
   updateWorldBoard();
 }
@@ -1105,17 +1677,39 @@ function formatTime(seconds) {
 
 function updateWorldBoard() {
   if (!worldBoard) return;
-  if (appMode === 'product') {
+  if (appMode === 'product' || appMode === 'mode-select') {
     worldBoard.visible = false;
     return;
   }
   if (fallDemoState === 'alerting') {
     worldBoard.visible = true;
     paintWorldBoard('ALERTA SIMULADA', ['La caída y la respuesta ocurren solo en esta demo.', 'No se enviaron llamadas ni mensajes.', 'Responde o cierra la prueba desde el panel.']);
-  } else if (fallDemoState === 'responded') {
+    return;
+  }
+  if (fallDemoState === 'responded') {
     worldBoard.visible = true;
     paintWorldBoard('RESPUESTA FICTICIA', ['El contacto no fue notificado.', 'Esta respuesta solo cambia la pantalla.', 'Cierra la prueba cuando quieras.']);
-  } else if (gameState.phase === 'instructions' || gameState.phase === 'ready') {
+    return;
+  }
+  if (gameMode === 'dynamic') {
+    if (dynamicState.phase === 'ready' || appMode === 'instructions') {
+      worldBoard.visible = true;
+      paintWorldBoard('PISTA DINÁMICA', ['Agarra el bastón para iniciar la pista.', 'Joystick izquierdo: cambia entre tres carriles.', 'L3 baja el ritmo · A / X pausa.', 'Usa el otro control del mismo mando para tocar una marca.']);
+    } else if (dynamicState.phase === 'paused') {
+      worldBoard.visible = true;
+      paintWorldBoard('PISTA EN PAUSA', ['El tiempo y la estamina se detuvieron.', 'Pulsa A / X para continuar.', 'La cámara permanece estable.']);
+    } else if (dynamicState.phase === 'finished') {
+      worldBoard.visible = true;
+      paintWorldBoard('¡META!', [`Marcas tocadas: ${dynamicState.markersCompleted.length}/${DYNAMIC_MARKERS.length}`, `Esquivados: ${dynamicState.obstaclesAvoided} · colisiones: ${dynamicState.collisions}`, 'Pulsa A / X para volver a jugar.']);
+    } else if (!dynamicState.caneHeld) {
+      worldBoard.visible = true;
+      paintWorldBoard('BASTÓN SUELTO', ['Agarra el bastón para reanudar la pista.', 'Pulso, respiración y estamina: simulados.', 'El contacto es virtual; no golpees el piso.']);
+    } else {
+      worldBoard.visible = false;
+    }
+    return;
+  }
+  if (gameState.phase === 'instructions' || gameState.phase === 'ready') {
     worldBoard.visible = true;
     paintWorldBoard('RUTA CANESMART', ['Aprieta el gatillo para tomar el bastón.', 'Joystick izquierdo: dirección horizontal del visor.', 'Apoyo moderado: avanzas con más equilibrio.']);
   } else if (gameState.phase === 'paused') {
@@ -1133,10 +1727,17 @@ function updateWorldBoard() {
 }
 
 function showFinishScreen() {
-  $('#final-time').textContent = formatTime(gameState.elapsed);
-  $('#final-score').textContent = fmt.format(gameState.points);
-  $('#final-obstacles').textContent = `${gameState.obstaclesAvoided} / ${GAME_ROUTE.obstacles.length}`;
-  $('#final-zones').textContent = `${gameState.zonesCompleted} / ${GAME_ROUTE.zones.length}`;
+  if (gameMode === 'dynamic') {
+    $('#final-time').textContent = formatTime(dynamicState.elapsed);
+    $('#final-score').textContent = `${Math.round(dynamicState.distance)} m`;
+    $('#final-obstacles').textContent = `${dynamicState.obstaclesAvoided}/${DYNAMIC_OBSTACLES.length} · ${dynamicState.collisions}`;
+    $('#final-zones').textContent = `${dynamicState.markersCompleted.length} / ${DYNAMIC_MARKERS.length}`;
+  } else {
+    $('#final-time').textContent = formatTime(gameState.elapsed);
+    $('#final-score').textContent = fmt.format(gameState.points);
+    $('#final-obstacles').textContent = `${gameState.obstaclesAvoided} / ${GAME_ROUTE.obstacles.length}`;
+    $('#final-zones').textContent = `${gameState.zonesCompleted} / ${GAME_ROUTE.zones.length}`;
+  }
   if (controls) controls.enabled = false;
   renderUI();
 }
@@ -1149,10 +1750,13 @@ function resetRun({ showChoices = false } = {}) {
   } else if (playerAvatar && caneRoot?.parent === playerAvatar) {
     worldGroup.attach(caneRoot);
   }
-  gameState = resetGame({ showInstructions: false });
+
+  if (gameMode === 'dynamic') dynamicState = createDynamicTrackState();
+  else gameState = resetGame({ showInstructions: false });
   appMode = showChoices ? 'reset-choice' : 'game';
   fallDemoState = 'idle';
   fallDemoPausedRun = false;
+  fallDemoPausedDynamic = false;
   viewer.classList.remove('is-alerting');
   if (caneRoot) {
     caneRoot.visible = true;
@@ -1166,20 +1770,46 @@ function resetRun({ showChoices = false } = {}) {
   }
   pressedKeys.clear();
   Object.keys(mouseMove).forEach((key) => { mouseMove[key] = false; });
-  activateCoursePresentation();
+  if (gameMode === 'dynamic') activateDynamicPresentation();
+  else activateCoursePresentation();
   const immersive = Boolean(renderer?.xr.isPresenting);
-  if (controls) controls.enabled = !immersive;
+  if (controls) controls.enabled = !immersive && gameMode !== 'dynamic';
   renderUI();
   if (showChoices) $('#game-toast').hidden = true;
-  else setMessage('Recorrido reiniciado · toma el bastón para empezar.', 'good');
+  else setMessage(gameMode === 'dynamic' ? 'Pista reiniciada · agarra el bastón para empezar.' : 'Recorrido reiniciado · toma el bastón para empezar.', 'good');
 }
 
 function showRouteInstructions() {
   if (appMode !== 'product' || !modelLoaded) return;
-  appMode = 'instructions';
+  appMode = 'mode-select';
   pressedKeys.clear();
   Object.keys(mouseMove).forEach((key) => { mouseMove[key] = false; });
-  activateCoursePresentation();
+  activateProductPresentation();
+  renderUI();
+}
+
+function selectGameMode(mode) {
+  if (!['free', 'dynamic'].includes(mode) || !modelLoaded) return;
+  gameMode = mode;
+  gameState = createGameState();
+  dynamicState = createDynamicTrackState();
+  appMode = 'instructions';
+  fallDemoState = 'idle';
+  fallDemoPausedRun = false;
+  fallDemoPausedDynamic = false;
+  pressedKeys.clear();
+  Object.keys(mouseMove).forEach((key) => { mouseMove[key] = false; });
+  if (mode === 'dynamic') activateDynamicPresentation();
+  else activateCoursePresentation();
+  updateXRMessageForMode();
+  updateInstructionCopy();
+  renderUI();
+}
+
+function backToModeSelection() {
+  if (appMode !== 'instructions') return;
+  appMode = 'mode-select';
+  activateProductPresentation();
   renderUI();
 }
 
@@ -1192,9 +1822,12 @@ function returnToProductView() {
     worldGroup.attach(caneRoot);
   }
   gameState = createGameState();
+  dynamicState = createDynamicTrackState();
+  gameMode = 'free';
   appMode = 'product';
   fallDemoState = 'idle';
   fallDemoPausedRun = false;
+  fallDemoPausedDynamic = false;
   viewer.classList.remove('is-alerting');
   if (worldGroup) worldGroup.position.set(0, 0, 0);
   if (playerAvatar) {
@@ -1216,25 +1849,32 @@ function returnToProductView() {
 
 function startFromInstructions() {
   if (appMode !== 'instructions') return;
-  dismissInstructions(gameState);
+  if (gameMode === 'free') dismissInstructions(gameState);
   appMode = 'game';
   pressedKeys.clear();
   Object.keys(mouseMove).forEach((key) => { mouseMove[key] = false; });
   instructionsScreen.hidden = true;
-  activateCoursePresentation();
-  if (controls) controls.enabled = !renderer?.xr.isPresenting;
-  setMessage('Toma el bastón para desbloquear el recorrido.', 'good', 2800);
+  if (gameMode === 'dynamic') {
+    activateDynamicPresentation({ setDesktopView: false });
+    if (controls) controls.enabled = false;
+    setMessage('Pista preparada · agarra el bastón para iniciar a ritmo moderado.', 'good', 2800);
+  } else {
+    activateCoursePresentation();
+    if (controls) controls.enabled = !renderer?.xr.isPresenting;
+    setMessage('Toma el bastón para desbloquear el recorrido.', 'good', 2800);
+  }
   ensureAudio();
   renderUI();
 }
 
 function pauseOrResume() {
-  const outcome = togglePause(gameState);
+  const outcome = gameMode === 'dynamic' ? toggleDynamicPause(dynamicState) : togglePause(gameState);
   if (outcome === 'paused') {
-    setMessage('Recorrido en pausa.', 'warning');
-    paintWorldBoard('PAUSA', ['Pulso y ritmo: simulados.', 'Pulsa A / X para continuar.', 'Usa Y / B para reiniciar.']);
+    setMessage(gameMode === 'dynamic' ? 'Pista en pausa · avance y estamina detenidos.' : 'Recorrido en pausa.', 'warning');
+    if (gameMode === 'dynamic') paintWorldBoard('PISTA EN PAUSA', ['El tiempo y la estamina se detuvieron.', 'Pulsa A / X para continuar.', 'La cámara permanece estable.']);
+    else paintWorldBoard('PAUSA', ['Pulso y ritmo: simulados.', 'Pulsa A / X para continuar.', 'Usa Y / B para reiniciar.']);
   } else if (outcome === 'resumed') {
-    setMessage('Seguimos · mantén un ritmo cómodo.', 'good');
+    setMessage(gameMode === 'dynamic' ? 'Pista reanudada · mantén un ritmo cómodo.' : 'Seguimos · mantén un ritmo cómodo.', 'good');
   }
   renderUI();
 }
@@ -1259,7 +1899,8 @@ function updateFallDemoUI() {
   const active = fallDemoState !== 'idle';
   card.classList.toggle('is-alerting', fallDemoState === 'alerting');
   card.classList.toggle('is-responded', fallDemoState === 'responded');
-  button.disabled = active || gameState.phase === 'instructions' || gameState.phase === 'finished';
+  const phase = gameMode === 'dynamic' ? dynamicState.phase : gameState.phase;
+  button.disabled = active || appMode !== 'game' || phase === 'instructions' || phase === 'finished';
   actions.hidden = !active;
   replyButton.hidden = fallDemoState !== 'alerting';
   resolveButton.textContent = fallDemoState === 'responded' ? 'Cerrar prueba' : 'Estoy bien · cerrar prueba';
@@ -1283,10 +1924,13 @@ function updateFallDemoUI() {
 }
 
 function startFallDemo() {
-  if (fallDemoState !== 'idle' || gameState.phase === 'instructions' || gameState.phase === 'finished') return;
-  fallDemoPausedRun = gameState.phase === 'playing';
+  const phase = gameMode === 'dynamic' ? dynamicState.phase : gameState.phase;
+  if (fallDemoState !== 'idle' || appMode !== 'game' || phase === 'instructions' || phase === 'finished') return;
+  fallDemoPausedDynamic = gameMode === 'dynamic' && dynamicState.phase === 'playing';
+  fallDemoPausedRun = gameMode === 'free' && gameState.phase === 'playing';
   if (fallDemoPausedRun && gameState.caneHeld) releaseCaneToCourse();
   if (fallDemoPausedRun) togglePause(gameState);
+  if (fallDemoPausedDynamic) toggleDynamicPause(dynamicState);
   fallDemoState = 'alerting';
   viewer.classList.add('is-alerting');
   updateFallDemoUI();
@@ -1309,7 +1953,9 @@ function resolveFallDemo() {
   fallDemoState = 'idle';
   viewer.classList.remove('is-alerting');
   if (fallDemoPausedRun && gameState.phase === 'paused') togglePause(gameState);
+  if (fallDemoPausedDynamic && dynamicState.phase === 'paused') toggleDynamicPause(dynamicState);
   fallDemoPausedRun = false;
+  fallDemoPausedDynamic = false;
   updateFallDemoUI();
   renderUI();
   setMessage('Prueba local cerrada. Si soltaste el bastón, tómalo para seguir.', 'good', 2500);
@@ -1318,13 +1964,22 @@ function resolveFallDemo() {
 function handleKeyboardAction(action) {
   if (action === 'start') {
     if (appMode === 'product') showRouteInstructions();
+    else if (appMode === 'mode-select') selectGameMode('free');
     else if (appMode === 'instructions') startFromInstructions();
-    else if (gameState.phase === 'paused') pauseOrResume();
-    else if (gameState.phase === 'finished') resetRun();
+    else if (gameMode === 'dynamic' && ['paused', 'finished'].includes(dynamicState.phase)) {
+      if (dynamicState.phase === 'paused') pauseOrResume();
+      else resetRun();
+    } else if (gameMode === 'free' && gameState.phase === 'paused') pauseOrResume();
+    else if (gameMode === 'free' && gameState.phase === 'finished') resetRun();
   } else if (action === 'grab') {
-    if (appMode !== 'game' || gameState.phase === 'instructions') return;
-    if (gameState.caneHeld) releaseCaneToCourse();
-    else grabForDesktop();
+    if (appMode !== 'game') return;
+    if (gameMode === 'dynamic') {
+      if (dynamicState.caneHeld) releaseDynamicCaneToTrack();
+      else grabForDesktop();
+    } else if (gameState.phase !== 'instructions') {
+      if (gameState.caneHeld) releaseCaneToCourse();
+      else grabForDesktop();
+    }
   } else if (action === 'pause') {
     if (appMode !== 'game') return;
     if (fallDemoState !== 'idle') resolveFallDemo();
@@ -1340,13 +1995,23 @@ function handleKeyboardAction(action) {
 
 function setupDesktopControls() {
   $('#begin-route').addEventListener('click', showRouteInstructions);
+  $('#choose-free-mode').addEventListener('click', () => selectGameMode('free'));
+  $('#choose-dynamic-mode').addEventListener('click', () => selectGameMode('dynamic'));
+  $('#back-to-modes').addEventListener('click', backToModeSelection);
   $('#recenter-camera').addEventListener('click', recenterCamera);
   $('#start-game').addEventListener('click', startFromInstructions);
-  $('#take-button').addEventListener('click', () => {
-    if (gameState.caneHeld) releaseCaneToCourse();
-    else grabForDesktop();
-  });
+  $('#take-button').addEventListener('click', grabForDesktop);
   $('#pause-button').addEventListener('click', pauseOrResume);
+  $('#dynamic-touch').addEventListener('click', touchDynamicMarker);
+  $('#dynamic-pause-control').addEventListener('click', pauseOrResume);
+  $('#dynamic-lane-left').addEventListener('click', () => moveDynamicLane(-1));
+  $('#dynamic-lane-right').addEventListener('click', () => moveDynamicLane(1));
+  $('#dynamic-pace').addEventListener('click', () => {
+    const nextPace = dynamicState.pace === 'moderate' ? 'slow' : 'moderate';
+    setDynamicPace(dynamicState, nextPace);
+    setMessage(nextPace === 'slow' ? 'Ritmo suave activado.' : 'Ritmo moderado activado.', 'good', 1500);
+    renderUI();
+  });
   $('#reset-button').addEventListener('click', () => resetRun({ showChoices: true }));
   $('#resume-game').addEventListener('click', pauseOrResume);
   $('#reset-from-pause').addEventListener('click', () => resetRun({ showChoices: true }));
@@ -1379,6 +2044,12 @@ function setupDesktopControls() {
     };
     button.addEventListener('pointerdown', (event) => {
       event.preventDefault();
+      if (gameMode === 'dynamic' && (direction === 'left' || direction === 'right')) {
+        moveDynamicLane(direction === 'left' ? -1 : 1);
+        button.classList.add('is-pressed');
+        button.setPointerCapture?.(event.pointerId);
+        return;
+      }
       mouseMove[direction] = true;
       button.classList.add('is-pressed');
       button.setPointerCapture?.(event.pointerId);
@@ -1412,6 +2083,19 @@ function setupDesktopControls() {
       if (!event.repeat || action === 'start') handleKeyboardAction(action);
       return;
     }
+    if (gameMode === 'dynamic' && appMode === 'game') {
+      if (event.code === 'KeyT') {
+        event.preventDefault();
+        if (!event.repeat) touchDynamicMarker();
+        return;
+      }
+      const laneDirections = { KeyA: -1, ArrowLeft: -1, KeyD: 1, ArrowRight: 1 };
+      if (laneDirections[event.code]) {
+        event.preventDefault();
+        if (!event.repeat) moveDynamicLane(laneDirections[event.code]);
+        return;
+      }
+    }
     const isMovement = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight', 'BracketLeft', 'BracketRight', 'Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract'].includes(event.code);
     if (isMovement) {
       event.preventDefault();
@@ -1428,19 +2112,18 @@ function setupDesktopControls() {
 
 function setWebXRSupport() {
   if (!renderer || !('xr' in navigator)) {
-    setXRMessage('WebXR no disponible', 'Este navegador no ofrece WebXR inmersivo.', 'En computador: W/S, A/D y cámara con el ratón. Usa C para recentrar.');
+    webXRAvailability = 'unsupported';
+    updateXRMessageForMode();
     return;
   }
   navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
-    if (!supported) {
-      setXRMessage('WebXR no disponible', 'Este dispositivo no informa compatibilidad con WebXR.', 'Usa el mismo recorrido en computador; WebXR se activa solo en navegadores compatibles.');
-      return;
-    }
-    setXRMessage('Entrar en Meta Quest', 'Joystick izquierdo: muévete según el giro horizontal del visor. La cabeza conserva su seguimiento natural; no necesitas caminar físicamente.', 'Quest: joystick izquierdo según hacia dónde miras; L3 acelera; gatillo sujeta; grip ajusta apoyo.', false);
-    xrButton.addEventListener('click', enterImmersiveMode);
+    webXRAvailability = supported ? 'supported' : 'unsupported';
+    updateXRMessageForMode();
+    if (supported) xrButton.addEventListener('click', enterImmersiveMode);
   }).catch((error) => {
     console.info('No se pudo consultar WebXR.', error);
-    setXRMessage('WebXR no disponible', 'No se pudo consultar compatibilidad WebXR.', 'El juego sigue disponible en computador.');
+    webXRAvailability = 'unsupported';
+    updateXRMessageForMode();
   });
 }
 
@@ -1462,7 +2145,7 @@ async function enterImmersiveMode() {
       controls.target.copy(desktopCamera.target);
       desktopCamera = null;
     }
-    controls.enabled = true;
+    controls.enabled = gameMode !== 'dynamic';
     setXRMessage('Reintentar Meta Quest', 'No se pudo iniciar la sesión; revisa permisos y vuelve a probar.', 'WebXR no inició. El recorrido en computador sigue disponible.', false);
     xrButton.disabled = false;
   }
@@ -1473,23 +2156,35 @@ function onXRSessionStart() {
   renderer.shadowMap.enabled = false;
   previousXRButtons.pause = false;
   previousXRButtons.restart = false;
-  if (gameState.caneHeld && !activeController && caneRoot.parent === playerAvatar) {
+  previousXRButtons.pace = false;
+  previousDynamicLaneDirection = 0;
+  if (gameMode === 'free' && gameState.caneHeld && !activeController && caneRoot.parent === playerAvatar) {
     worldGroup.attach(caneRoot);
     caneRoot.position.set(gameState.player.x + 0.38, PLATFORM_TOP, gameState.player.z + 0.12);
     caneRoot.rotation.set(0, DEFAULT_YAW, 0);
     dropCane(gameState);
   }
+  if (gameMode === 'dynamic') {
+    comfortBeforeDynamicXR = comfortEnabled;
+    comfortEnabled = true;
+    comfortToggle.checked = true;
+  }
   controls.enabled = false;
   vrHud.visible = true;
   if (comfortMask) comfortMask.visible = false;
   controllers.forEach((controller) => { if (controller.userData.ray) controller.userData.ray.visible = true; });
-  if (gameState.phase === 'instructions') {
-    dismissInstructions(gameState);
+  if (appMode === 'instructions') {
+    if (gameMode === 'free') dismissInstructions(gameState);
     appMode = 'game';
-    activateCoursePresentation();
+    if (gameMode === 'dynamic') activateDynamicPresentation({ setDesktopView: false });
+    else activateCoursePresentation();
     instructionsScreen.hidden = true;
   }
-  setXRMessage('En Meta Quest', 'Joystick izquierdo: avanza, retrocede y desplázate respecto a la dirección horizontal del visor. Gira la cabeza naturalmente; no necesitas caminar físicamente.', 'A/X pausa; Y/B reinicia. El desplazamiento se controla con el joystick; no camines por la habitación.', true);
+  if (gameMode === 'dynamic') {
+    setXRMessage('En Pista dinámica · Quest', 'Ritmo moderado · L3 lo reduce · pausa A/X inmediata · cámara estable.', 'Joystick izquierdo cambia de carril · L3 alterna ritmo suave. Sujeta el bastón; pulsa el otro control del mismo mando para tocar virtualmente. No golpees el suelo real.', true);
+  } else {
+    setXRMessage('En Meta Quest', 'Joystick izquierdo: avanza, retrocede y desplázate respecto a la dirección horizontal del visor. Gira la cabeza naturalmente; no necesitas caminar físicamente.', 'A/X pausa; Y/B reinicia. El desplazamiento se controla con el joystick; no camines por la habitación.', true);
+  }
   renderUI();
 }
 
@@ -1504,10 +2199,14 @@ function onXRSessionEnd() {
     camera.position.copy(desktopCamera.position);
     camera.rotation.copy(desktopCamera.rotation);
     controls.target.copy(desktopCamera.target);
-    controls.enabled = gameState.phase !== 'finished';
+    controls.enabled = gameMode !== 'dynamic' && gameState.phase !== 'finished';
     desktopCamera = null;
   }
-  setXRMessage('Entrar en Meta Quest', 'Joystick izquierdo: muévete según el giro horizontal del visor. La cabeza conserva su seguimiento natural; no necesitas caminar físicamente.', 'Quest: joystick izquierdo según hacia dónde miras; L3 acelera; gatillo sujeta; grip ajusta apoyo.', false);
+  if (gameMode === 'dynamic') {
+    comfortEnabled = comfortBeforeDynamicXR;
+    comfortToggle.checked = comfortEnabled;
+  }
+  updateXRMessageForMode();
   renderUI();
 }
 
@@ -1551,6 +2250,36 @@ function updateDesktopCameraFollow() {
   }
   cameraFollowPlayerPosition.x = playerPosition.x;
   cameraFollowPlayerPosition.z = playerPosition.z;
+}
+
+function activeDynamicInput() {
+  if (appMode !== 'game') return { speedScale: 1 };
+  if (renderer.xr.isPresenting) {
+    const session = renderer.xr.getSession();
+    const sources = session ? Array.from(session.inputSources) : [];
+    const xrInput = readXRInputSources(sources);
+    if (xrInput.pause && !previousXRButtons.pause) {
+      if (fallDemoState !== 'idle') resolveFallDemo();
+      else if (dynamicState.phase === 'finished') resetRun();
+      else pauseOrResume();
+    }
+    if (xrInput.restart && !previousXRButtons.restart) resetRun();
+    if (xrInput.sprint && !previousXRButtons.pace) {
+      const nextPace = dynamicState.pace === 'moderate' ? 'slow' : 'moderate';
+      setDynamicPace(dynamicState, nextPace);
+      setMessage(nextPace === 'slow' ? 'Ritmo suave activado.' : 'Ritmo moderado activado.', 'good', 1500);
+      renderUI();
+    }
+    previousXRButtons.pause = xrInput.pause;
+    previousXRButtons.restart = xrInput.restart;
+    previousXRButtons.pace = xrInput.sprint;
+
+    const direction = Math.abs(xrInput.moveX) >= 0.56 ? Math.sign(xrInput.moveX) : 0;
+    if (dynamicState.phase === 'playing' && direction !== 0 && direction !== previousDynamicLaneDirection) moveDynamicLane(direction);
+    previousDynamicLaneDirection = direction;
+    return { speedScale: 0.82 };
+  }
+  return { speedScale: 1 };
 }
 
 function activeGameInput(delta) {
@@ -1619,6 +2348,70 @@ function updateSceneFromGame() {
   }
 }
 
+function updateDynamicScene() {
+  if (!dynamicTrackGroup || !playerAvatar) return;
+  worldGroup.position.set(0, 0, 0);
+  const offset = dynamicState.distance % DYNAMIC_TRACK.segmentLength;
+  dynamicSegmentVisuals.forEach((segment, index) => {
+    const z = DYNAMIC_TRACK.segmentLength * (1 - index) + offset;
+    segment.position.set(0, 0, z);
+  });
+
+  const laneX = laneToX(dynamicState.lanePosition);
+  const isFallDemoActive = fallDemoState !== 'idle';
+  playerAvatar.position.set(laneX, isFallDemoActive ? -0.34 : 0, 0);
+  const stride = dynamicState.speed > 0.05 ? Math.sin(elapsedScene * 7.2) : 0;
+  avatarLeftLeg.rotation.x = stride * 0.26;
+  avatarRightLeg.rotation.x = -stride * 0.26;
+  avatarTorso.position.y = 1.12 + (dynamicState.speed > 0.05 ? Math.abs(stride) * 0.018 : 0);
+  playerAvatar.rotation.x = isFallDemoActive ? 1.12 : 0;
+  playerAvatar.rotation.z = isFallDemoActive ? -0.1 : 0;
+  avatarHead.visible = !renderer.xr.isPresenting;
+
+  for (const marker of dynamicMarkerVisuals) {
+    const { id, distance, ring, glow, beacon } = marker.userData;
+    const z = dynamicState.distance - distance;
+    marker.position.z = z;
+    marker.visible = z < 6 && z > -48;
+    const completed = dynamicState.markersCompleted.includes(id);
+    const pulse = 1 + Math.sin(elapsedScene * 3.8 + distance) * 0.08;
+    const age = marker.userData.collectedAt === null ? Infinity : elapsedScene - marker.userData.collectedAt;
+    const flash = completed && age < 0.42 ? Math.sin((age / 0.42) * Math.PI) : 0;
+    ring.scale.setScalar(completed ? 0.78 + flash * 0.62 : pulse);
+    ring.material.color.setHex(completed ? 0xc6f2a5 : 0x91f4d0);
+    ring.material.opacity = completed ? (age < 0.42 ? 0.4 + flash * 0.58 : 0.24) : 0.78 + pulse * 0.12;
+    glow.material.opacity = completed ? 0.08 : 0.16 + pulse * 0.08;
+    beacon.material.opacity = completed ? 0.26 : 0.72 + pulse * 0.16;
+    beacon.scale.setScalar(1 + pulse * 0.04);
+  }
+
+  for (const obstacle of dynamicObstacleVisuals) {
+    const z = dynamicState.distance - obstacle.userData.distance;
+    obstacle.position.z = z;
+    obstacle.visible = z < 6 && z > -10;
+    const result = dynamicState.obstacleResults[obstacle.userData.id];
+    obstacle.userData.halo.material.opacity = result === 'avoided' ? 0.18 : result === 'hit' ? 0.26 : 0.62;
+    obstacle.userData.cone.material.emissiveIntensity = result === 'hit' ? 0.08 : 0.24;
+  }
+
+  if (dynamicStartGate) {
+    dynamicStartGate.position.z = dynamicState.distance - dynamicStartGate.userData.distance;
+    dynamicStartGate.visible = dynamicStartGate.position.z > -4 && dynamicStartGate.position.z < 4;
+  }
+  if (dynamicFinishGate) {
+    dynamicFinishGate.position.z = dynamicState.distance - dynamicFinishGate.userData.distance;
+    dynamicFinishGate.visible = dynamicFinishGate.position.z < 8 && dynamicFinishGate.position.z > -12;
+  }
+  if (dynamicStartLine) {
+    dynamicStartLine.position.z = dynamicState.distance - dynamicStartLine.userData.distance;
+    dynamicStartLine.visible = dynamicStartLine.position.z < 1.5 && dynamicStartLine.position.z > -3;
+  }
+  if (dynamicFinishLine) {
+    dynamicFinishLine.position.z = dynamicState.distance - dynamicFinishLine.userData.distance;
+    dynamicFinishLine.visible = dynamicFinishLine.position.z < 8 && dynamicFinishLine.position.z > -12;
+  }
+}
+
 function showNoCaneReminder(input) {
   if (gameState.caneHeld || !input || (Math.abs(input.moveX) < 0.08 && Math.abs(input.forward) < 0.08)) return;
   if (gameState.phase !== 'ready' && gameState.phase !== 'playing') return;
@@ -1628,8 +2421,10 @@ function showNoCaneReminder(input) {
   setMessage('Primero toma el bastón: sin agarre no puedes avanzar.', 'warning');
 }
 
-function updateComfortEffects(input) {
-  const moving = Math.abs(input.moveX) + Math.abs(input.forward) > 0.12 && gameState.caneHeld && gameState.phase === 'playing';
+function updateComfortEffects(input = {}) {
+  const moving = gameMode === 'dynamic'
+    ? dynamicState.phase === 'playing' && dynamicState.caneHeld && dynamicState.speed > 0.05
+    : Math.abs(input.moveX || 0) + Math.abs(input.forward || 0) > 0.12 && gameState.caneHeld && gameState.phase === 'playing';
   const immersive = renderer.xr.isPresenting;
   if (comfortMask) comfortMask.visible = immersive && comfortEnabled && moving;
   $('#comfort-vignette').classList.toggle('is-on', immersive && comfortEnabled && moving);
@@ -1639,15 +2434,26 @@ function renderFrame() {
   if (!renderer || !scene || !camera) return;
   const delta = Math.min(clock.getDelta(), 0.06);
   elapsedScene += delta;
-  const input = activeGameInput(delta);
-  if (gameState.phase === 'playing') {
-    const events = stepGame(gameState, input, delta);
-    handleGameEvents(events);
-    showNoCaneReminder(input);
+
+  if (gameMode === 'dynamic') {
+    const input = activeDynamicInput();
+    if (appMode === 'game' && dynamicState.phase === 'playing') {
+      const events = stepDynamicTrack(dynamicState, input, delta);
+      handleDynamicEvents(events);
+    }
+    updateDynamicScene();
+    updateComfortEffects();
+  } else {
+    const input = activeGameInput(delta);
+    if (gameState.phase === 'playing') {
+      const events = stepGame(gameState, input, delta);
+      handleGameEvents(events);
+      showNoCaneReminder(input);
+    }
+    updateSceneFromGame();
+    updateComfortEffects(input);
+    updateDesktopCameraFollow();
   }
-  updateSceneFromGame();
-  updateComfortEffects(input);
-  updateDesktopCameraFollow();
   if (controls?.enabled && !renderer.xr.isPresenting) controls.update();
 
   uiAccumulator += delta;
