@@ -17,6 +17,7 @@ import {
   togglePause,
 } from './game-engine.js';
 import { keyboardAction, movementRelativeToView, readKeyboardInput, readXRInputSources } from './input-mapping.js';
+import { translateCameraWithPlayer } from './camera-follow.js';
 import './style.css';
 
 const $ = (selector) => document.querySelector(selector);
@@ -40,9 +41,8 @@ $('#sketch-link').href = sketchUrl;
 const MODEL_SCALE = 0.58;
 const PLATFORM_TOP = 0.075;
 const DEFAULT_YAW = -0.18;
-const CAMERA_FOLLOW_LOOK_AHEAD = 3.8;
-const CAMERA_FOLLOW_HEIGHT = 0.88;
-const CAMERA_FOLLOW_RATE = 5.2;
+const COURSE_CAMERA_LOOK_AHEAD = 0.8;
+const COURSE_CAMERA_TARGET_HEIGHT = 0.95;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const fmt = new Intl.NumberFormat('es-CO');
 
@@ -95,7 +95,7 @@ const rayMatrix = new THREE.Matrix4();
 const rayOrigin = new THREE.Vector3();
 const rayDirection = new THREE.Vector3();
 const movementForward = new THREE.Vector3();
-const desiredCameraTarget = new THREE.Vector3();
+const cameraFollowPlayerPosition = { x: 0, z: 0 };
 const clock = new THREE.Clock();
 
 function setXRMessage(buttonText, note, guideText, disabled = true) {
@@ -326,7 +326,7 @@ function buildCourse() {
     courseGroup.add(segment);
   });
 
-  makeCourseGate(0.55, 'INICIO', 'Toma el bastón', {});
+  makeCourseGate(-0.85, 'INICIO', 'Toma el bastón', {});
   makeCourseGate(-6, 'TRAMO 02', 'Esquiva y avanza');
   makeCourseGate(-18, 'TRAMO 03', 'Último desafío');
   makeCourseGate(GAME_ROUTE.finishZ - 0.25, 'META', '¡Lo lograste!', { finish: true });
@@ -529,6 +529,7 @@ function createCaneStand() {
 
 function setProductCamera() {
   if (!camera || !controls || renderer?.xr.isPresenting) return;
+  controls.enableDamping = true;
   camera.position.set(1.55, 1.4, 1.83);
   controls.target.set(0.34, 0.62, -0.42);
   controls.enableRotate = true;
@@ -544,9 +545,13 @@ function setProductCamera() {
 
 function setCourseCamera() {
   if (!camera || !controls || renderer?.xr.isPresenting) return;
+  controls.enableDamping = false;
+  controls.update();
   const { x, z } = gameState.player;
-  camera.position.set(x + 0.28, 2.25, z + 2.95);
-  controls.target.set(x + 0.28, CAMERA_FOLLOW_HEIGHT, z - CAMERA_FOLLOW_LOOK_AHEAD);
+  cameraFollowPlayerPosition.x = x;
+  cameraFollowPlayerPosition.z = z;
+  camera.position.set(x + 0.28, 2.55, z + 4.8);
+  controls.target.set(x + 0.28, COURSE_CAMERA_TARGET_HEIGHT, z - COURSE_CAMERA_LOOK_AHEAD);
   controls.enableRotate = true;
   controls.enableZoom = true;
   controls.enablePan = false;
@@ -1526,11 +1531,26 @@ function getHorizontalViewForward() {
   return { x: movementForward.x, z: movementForward.z };
 }
 
-function updateDesktopCameraFollow(delta) {
-  if (!controls?.enabled || renderer?.xr.isPresenting || appMode !== 'game' || gameState.phase === 'finished') return;
-  desiredCameraTarget.set(gameState.player.x + 0.28, CAMERA_FOLLOW_HEIGHT, gameState.player.z - CAMERA_FOLLOW_LOOK_AHEAD);
-  const blend = 1 - Math.exp(-CAMERA_FOLLOW_RATE * delta);
-  controls.target.lerp(desiredCameraTarget, blend);
+function updateDesktopCameraFollow() {
+  const playerPosition = gameState.player;
+  if (appMode === 'game') {
+    if (renderer?.xr.isPresenting) {
+      // Keep the saved desktop view aligned while leaving the tracked XR camera untouched.
+      if (desktopCamera) {
+        translateCameraWithPlayer(
+          desktopCamera.position,
+          desktopCamera.target,
+          cameraFollowPlayerPosition,
+          playerPosition,
+        );
+      }
+    } else if (camera && controls) {
+      // Applying the same world-space delta preserves the user's orbit and zoom exactly.
+      translateCameraWithPlayer(camera.position, controls.target, cameraFollowPlayerPosition, playerPosition);
+    }
+  }
+  cameraFollowPlayerPosition.x = playerPosition.x;
+  cameraFollowPlayerPosition.z = playerPosition.z;
 }
 
 function activeGameInput(delta) {
@@ -1627,7 +1647,7 @@ function renderFrame() {
   }
   updateSceneFromGame();
   updateComfortEffects(input);
-  updateDesktopCameraFollow(delta);
+  updateDesktopCameraFollow();
   if (controls?.enabled && !renderer.xr.isPresenting) controls.update();
 
   uiAccumulator += delta;
