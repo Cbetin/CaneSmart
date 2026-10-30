@@ -17,10 +17,33 @@ export function readKeyboardInput(keys = new Set()) {
   };
 }
 
+export function movementRelativeToView(input = {}, viewForward = { x: 0, z: -1 }) {
+  let forwardX = Number(viewForward.x) || 0;
+  let forwardZ = Number(viewForward.z) || 0;
+  const forwardLength = Math.hypot(forwardX, forwardZ);
+  if (forwardLength < 1e-6) {
+    forwardX = 0;
+    forwardZ = -1;
+  } else {
+    forwardX /= forwardLength;
+    forwardZ /= forwardLength;
+  }
+
+  const strafe = clamp(Number(input.moveX) || 0, -1, 1);
+  const forward = clamp(Number(input.forward) || 0, -1, 1);
+  const rightX = -forwardZ;
+  const rightZ = forwardX;
+  const worldX = rightX * strafe + forwardX * forward;
+  const worldZ = rightZ * strafe + forwardZ * forward;
+  const cleanZero = (value) => Math.abs(value) < 1e-12 ? 0 : value;
+  return { moveX: cleanZero(worldX), forward: cleanZero(-worldZ) };
+}
+
 export function keyboardAction(code) {
   if (code === 'Space' || code === 'KeyE') return 'grab';
   if (code === 'KeyP' || code === 'Escape') return 'pause';
   if (code === 'KeyR') return 'restart';
+  if (code === 'KeyC') return 'recenter';
   if (code === 'KeyF') return 'fall';
   if (code === 'Enter') return 'start';
   return '';

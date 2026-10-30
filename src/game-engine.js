@@ -183,6 +183,7 @@ function checkObstacleCollisions(state, previousZ, events) {
 function progressStages(state, events) {
   for (;;) {
     const stage = GAME_ROUTE.stages[state.stageIndex];
+    // Gates constrain forward progress only; walking back toward the start stays free.
     if (!stage || state.player.z > stage.endZ) return;
 
     if (!isStageComplete(state, stage)) {
@@ -220,7 +221,8 @@ export function stepGame(state, input = {}, deltaSeconds = 1 / 60) {
   const previousZ = state.player.z;
   const moveX = clamp(Number(input.moveX) || 0, -1, 1);
   const forward = clamp(Number(input.forward) || 0, -1, 1);
-  const magnitude = Math.min(1, Math.hypot(moveX, forward));
+  const inputMagnitude = Math.hypot(moveX, forward);
+  const magnitude = Math.min(1, inputMagnitude);
   const hasInput = magnitude > 0.04;
   const hasCane = state.caneHeld;
   const support = state.support;
@@ -235,7 +237,7 @@ export function stepGame(state, input = {}, deltaSeconds = 1 / 60) {
   state.speed = speed;
 
   if (speed > 0) {
-    const divisor = Math.max(magnitude, 0.001);
+    const divisor = Math.max(inputMagnitude, 0.001);
     const nextX = clamp(state.player.x + (moveX / divisor) * speed * dt, GAME_ROUTE.minX, GAME_ROUTE.maxX);
     const nextZ = state.player.z - (forward / divisor) * speed * dt;
     state.player.x = nextX;

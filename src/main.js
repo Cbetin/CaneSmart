@@ -16,7 +16,7 @@ import {
   stepGame,
   togglePause,
 } from './game-engine.js';
-import { keyboardAction, readKeyboardInput, readXRInputSources } from './input-mapping.js';
+import { keyboardAction, movementRelativeToView, readKeyboardInput, readXRInputSources } from './input-mapping.js';
 import './style.css';
 
 const $ = (selector) => document.querySelector(selector);
@@ -40,6 +40,9 @@ $('#sketch-link').href = sketchUrl;
 const MODEL_SCALE = 0.58;
 const PLATFORM_TOP = 0.075;
 const DEFAULT_YAW = -0.18;
+const CAMERA_FOLLOW_LOOK_AHEAD = 3.8;
+const CAMERA_FOLLOW_HEIGHT = 0.88;
+const CAMERA_FOLLOW_RATE = 5.2;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const fmt = new Intl.NumberFormat('es-CO');
 
@@ -91,6 +94,8 @@ const raycaster = new THREE.Raycaster();
 const rayMatrix = new THREE.Matrix4();
 const rayOrigin = new THREE.Vector3();
 const rayDirection = new THREE.Vector3();
+const movementForward = new THREE.Vector3();
+const desiredCameraTarget = new THREE.Vector3();
 const clock = new THREE.Clock();
 
 function setXRMessage(buttonText, note, guideText, disabled = true) {
@@ -539,17 +544,25 @@ function setProductCamera() {
 
 function setCourseCamera() {
   if (!camera || !controls || renderer?.xr.isPresenting) return;
-  camera.position.set(2.25, 2.25, 2.95);
-  controls.target.set(0, 0.88, -3.8);
+  const { x, z } = gameState.player;
+  camera.position.set(x + 0.28, 2.25, z + 2.95);
+  controls.target.set(x + 0.28, CAMERA_FOLLOW_HEIGHT, z - CAMERA_FOLLOW_LOOK_AHEAD);
   controls.enableRotate = true;
   controls.enableZoom = true;
   controls.enablePan = false;
-  controls.minDistance = 3.8;
-  controls.maxDistance = 12;
+  controls.minDistance = 5.1;
+  controls.maxDistance = 10.5;
   controls.minPolarAngle = 0.12;
   controls.maxPolarAngle = Math.PI * 0.48;
   controls.update();
   controls.saveState();
+}
+
+function recenterCamera() {
+  if (!controls || renderer?.xr.isPresenting) return;
+  controls.enabled = true;
+  if (appMode === 'product') setProductCamera();
+  else if (appMode === 'game' || appMode === 'instructions') setCourseCamera();
 }
 
 function activateProductPresentation() {
@@ -588,7 +601,7 @@ function createWorldBoard() {
   worldBoard.renderOrder = 10;
   worldBoard.visible = false;
   worldGroup.add(worldBoard);
-  paintWorldBoard('RUTA CANESMART', ['Aprieta el gatillo para tomar el bastón.', 'Joystick izquierdo: avanza y esquiva.', 'Grip izquierdo ajusta apoyo; mantén un nivel moderado.']);
+  paintWorldBoard('RUTA CANESMART', ['Aprieta el gatillo para tomar el bastón.', 'Joystick izquierdo: muévete según hacia dónde miras.', 'La cabeza gira naturalmente; no necesitas caminar físicamente.']);
 }
 
 function paintWorldBoard(title, lines) {
@@ -811,7 +824,7 @@ function grabForDesktop() {
   caneRoot.position.set(0.3, 0.03, 0.05);
   caneRoot.rotation.set(0, DEFAULT_YAW, 0);
   grabCane(gameState);
-  if (controls && !renderer?.xr.isPresenting) controls.enabled = false;
+  if (controls && !renderer?.xr.isPresenting) controls.enabled = true;
   setMessage('Agarre listo · avanza a ritmo moderado.', 'good');
   ensureAudio();
   renderUI();
@@ -1005,6 +1018,7 @@ function renderUI() {
   takeButton.hidden = appMode !== 'game';
   pauseButton.hidden = appMode !== 'game';
   $('#reset-button').hidden = appMode !== 'game';
+  $('#recenter-camera').hidden = !controls || appMode !== 'game' || Boolean(renderer?.xr.isPresenting);
   $('#stage-number').textContent = `TRAMO ${String(gameState.stageIndex + 1).padStart(2, '0')} / 03`;
   $('#stage-goal').textContent = !gameState.caneHeld && gameState.phase !== 'instructions'
     ? 'Toma el bastón para desbloquear el movimiento; después completa las zonas de este tramo.'
@@ -1098,7 +1112,7 @@ function updateWorldBoard() {
     paintWorldBoard('RESPUESTA FICTICIA', ['El contacto no fue notificado.', 'Esta respuesta solo cambia la pantalla.', 'Cierra la prueba cuando quieras.']);
   } else if (gameState.phase === 'instructions' || gameState.phase === 'ready') {
     worldBoard.visible = true;
-    paintWorldBoard('RUTA CANESMART', ['Aprieta el gatillo para tomar el bastón.', 'Joystick izquierdo: avanza y esquiva.', 'Apoyo moderado: avanzas con más equilibrio.']);
+    paintWorldBoard('RUTA CANESMART', ['Aprieta el gatillo para tomar el bastón.', 'Joystick izquierdo: dirección horizontal del visor.', 'Apoyo moderado: avanzas con más equilibrio.']);
   } else if (gameState.phase === 'paused') {
     worldBoard.visible = true;
     paintWorldBoard('PAUSA', ['Pulso y ritmo: simulados.', 'Pulsa A / X para continuar.', 'Usa Y / B para reiniciar.']);
@@ -1312,6 +1326,8 @@ function handleKeyboardAction(action) {
     else pauseOrResume();
   } else if (action === 'restart') {
     if (appMode === 'game') resetRun({ showChoices: true });
+  } else if (action === 'recenter') {
+    recenterCamera();
   } else if (action === 'fall') {
     if (appMode === 'game') startFallDemo();
   }
@@ -1319,6 +1335,7 @@ function handleKeyboardAction(action) {
 
 function setupDesktopControls() {
   $('#begin-route').addEventListener('click', showRouteInstructions);
+  $('#recenter-camera').addEventListener('click', recenterCamera);
   $('#start-game').addEventListener('click', startFromInstructions);
   $('#take-button').addEventListener('click', () => {
     if (gameState.caneHeld) releaseCaneToCourse();
@@ -1406,7 +1423,7 @@ function setupDesktopControls() {
 
 function setWebXRSupport() {
   if (!renderer || !('xr' in navigator)) {
-    setXRMessage('WebXR no disponible', 'Este navegador no ofrece WebXR inmersivo.', 'El recorrido sigue funcionando en computador con WASD, flechas y el pad de ratón.');
+    setXRMessage('WebXR no disponible', 'Este navegador no ofrece WebXR inmersivo.', 'En computador: W/S, A/D y cámara con el ratón. Usa C para recentrar.');
     return;
   }
   navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
@@ -1414,7 +1431,7 @@ function setWebXRSupport() {
       setXRMessage('WebXR no disponible', 'Este dispositivo no informa compatibilidad con WebXR.', 'Usa el mismo recorrido en computador; WebXR se activa solo en navegadores compatibles.');
       return;
     }
-    setXRMessage('Entrar en Meta Quest', 'Joystick izquierdo para moverte; L3 acelera; gatillo toma/suelta; grip izquierdo ajusta apoyo.', 'Quest: joystick izquierdo para desplazarte; gatillo sujeta el bastón; grip izquierdo ajusta apoyo.', false);
+    setXRMessage('Entrar en Meta Quest', 'Joystick izquierdo: muévete según el giro horizontal del visor. La cabeza conserva su seguimiento natural; no necesitas caminar físicamente.', 'Quest: joystick izquierdo según hacia dónde miras; L3 acelera; gatillo sujeta; grip ajusta apoyo.', false);
     xrButton.addEventListener('click', enterImmersiveMode);
   }).catch((error) => {
     console.info('No se pudo consultar WebXR.', error);
@@ -1425,9 +1442,6 @@ function setWebXRSupport() {
 async function enterImmersiveMode() {
   if (!renderer || !navigator.xr || renderer.xr.isPresenting) return;
   desktopCamera = { position: camera.position.clone(), rotation: camera.rotation.clone(), target: controls.target.clone() };
-  camera.position.set(0, 0, 0);
-  camera.rotation.set(0, 0, 0);
-  camera.updateMatrixWorld(true);
   controls.enabled = false;
   xrButton.disabled = true;
   try {
@@ -1470,7 +1484,7 @@ function onXRSessionStart() {
     activateCoursePresentation();
     instructionsScreen.hidden = true;
   }
-  setXRMessage('En Meta Quest', 'Joystick: avanzar y esquivar. L3: acelerar. Gatillo: sujetar. Grip izquierdo: apoyo.', 'A/X para pausa; Y/B para reiniciar. No necesitas caminar físicamente por la habitación.', true);
+  setXRMessage('En Meta Quest', 'Joystick izquierdo: avanza, retrocede y desplázate respecto a la dirección horizontal del visor. Gira la cabeza naturalmente; no necesitas caminar físicamente.', 'A/X pausa; Y/B reinicia. El desplazamiento se controla con el joystick; no camines por la habitación.', true);
   renderUI();
 }
 
@@ -1485,10 +1499,10 @@ function onXRSessionEnd() {
     camera.position.copy(desktopCamera.position);
     camera.rotation.copy(desktopCamera.rotation);
     controls.target.copy(desktopCamera.target);
-    controls.enabled = gameState.phase !== 'playing';
+    controls.enabled = gameState.phase !== 'finished';
     desktopCamera = null;
   }
-  setXRMessage('Entrar en Meta Quest', 'Joystick izquierdo para moverte; L3 acelera; gatillo toma/suelta; grip izquierdo ajusta apoyo.', 'Quest: joystick izquierdo para desplazarte; gatillo sujeta el bastón; grip izquierdo ajusta apoyo.', false);
+  setXRMessage('Entrar en Meta Quest', 'Joystick izquierdo: muévete según el giro horizontal del visor. La cabeza conserva su seguimiento natural; no necesitas caminar físicamente.', 'Quest: joystick izquierdo según hacia dónde miras; L3 acelera; gatillo sujeta; grip ajusta apoyo.', false);
   renderUI();
 }
 
@@ -1500,6 +1514,23 @@ function resizeRenderer() {
   camera.updateProjectionMatrix();
   renderer.setSize(width, height, false);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+}
+
+function getHorizontalViewForward() {
+  const viewCamera = renderer?.xr.isPresenting ? renderer.xr.getCamera() : camera;
+  if (!viewCamera) return { x: 0, z: -1 };
+  viewCamera.getWorldDirection(movementForward);
+  movementForward.y = 0;
+  if (movementForward.lengthSq() < 1e-8) movementForward.set(0, 0, -1);
+  else movementForward.normalize();
+  return { x: movementForward.x, z: movementForward.z };
+}
+
+function updateDesktopCameraFollow(delta) {
+  if (!controls?.enabled || renderer?.xr.isPresenting || appMode !== 'game' || gameState.phase === 'finished') return;
+  desiredCameraTarget.set(gameState.player.x + 0.28, CAMERA_FOLLOW_HEIGHT, gameState.player.z - CAMERA_FOLLOW_LOOK_AHEAD);
+  const blend = 1 - Math.exp(-CAMERA_FOLLOW_RATE * delta);
+  controls.target.lerp(desiredCameraTarget, blend);
 }
 
 function activeGameInput(delta) {
@@ -1520,16 +1551,17 @@ function activeGameInput(delta) {
     if (xrInput.restart && !previousXRButtons.restart) resetRun();
     previousXRButtons.pause = xrInput.pause;
     previousXRButtons.restart = xrInput.restart;
-    return { ...xrInput, speedScale: comfortEnabled ? 0.72 : 1 };
+    const relativeMovement = movementRelativeToView(xrInput, getHorizontalViewForward());
+    return { ...xrInput, ...relativeMovement, speedScale: comfortEnabled ? 0.72 : 1 };
   }
 
   const keyboard = readKeyboardInput(pressedKeys);
   const moveX = clamp(keyboard.moveX + Number(mouseMove.right) - Number(mouseMove.left), -1, 1);
   const forward = clamp(keyboard.forward + Number(mouseMove.forward) - Number(mouseMove.back), -1, 1);
   if (keyboard.supportDelta) setSupport(gameState, gameState.support + keyboard.supportDelta * delta * 0.42);
+  const relativeMovement = movementRelativeToView({ moveX, forward }, getHorizontalViewForward());
   return {
-    moveX,
-    forward,
+    ...relativeMovement,
     sprint: keyboard.sprint || mouseMove.sprint,
     speedScale: comfortEnabled ? 0.72 : 1,
   };
@@ -1537,7 +1569,8 @@ function activeGameInput(delta) {
 
 function updateSceneFromGame() {
   if (!worldGroup || !playerAvatar) return;
-  worldGroup.position.set(-gameState.player.x, 0, -gameState.player.z);
+  if (renderer.xr.isPresenting) worldGroup.position.set(-gameState.player.x, 0, -gameState.player.z);
+  else worldGroup.position.set(0, 0, 0);
   const isFallDemoActive = fallDemoState !== 'idle';
   playerAvatar.position.set(gameState.player.x, isFallDemoActive ? -0.34 : 0, gameState.player.z);
   const stride = gameState.speed > 0.05 ? Math.sin(elapsedScene * (gameState.speed > 1.55 ? 11 : 7.2)) : 0;
@@ -1594,6 +1627,7 @@ function renderFrame() {
   }
   updateSceneFromGame();
   updateComfortEffects(input);
+  updateDesktopCameraFollow(delta);
   if (controls?.enabled && !renderer.xr.isPresenting) controls.update();
 
   uiAccumulator += delta;

@@ -337,6 +337,13 @@ h1 span { color: #9bc9a9; }
   .guide-strip { flex-wrap: wrap; }
   .guide-item { flex: 1; }
   .guide-disclaimer { margin-left: auto; }
+  .viewer-bottomline { gap: 6px; }
+  .viewer-caption, .caption-title { max-width: 130px; }
+  .viewer-actions { gap: 3px; }
+  .take-button, .xr-button, .pause-button, .reset-view-button { width: 34px; min-width: 34px; height: 34px; }
+  .take-button { padding: 0; }
+  .take-button span, .take-button kbd, .xr-button span { display: none; }
+  .xr-button { max-width: 34px; padding: 0; }
 }
 
 @media (max-width: 700px) {
@@ -363,19 +370,20 @@ h1 span { color: #9bc9a9; }
   .guide-divider { display: none; }
   .guide-disclaimer { width: 100%; min-width: 0; margin: 0; }
   .viewer-topline { left: 12px; right: 12px; top: 12px; }
-  .viewer-bottomline { left: 10px; right: 10px; bottom: 10px; align-items: end; gap: 8px; }
-  .viewer-actions { gap: 4px; }
+  .viewer-bottomline { left: 10px; right: 10px; bottom: 10px; align-items: end; gap: 6px; }
+  .viewer-caption { max-width: 138px; }
+  .viewer-actions { gap: 3px; }
   .begin-route-button { min-width: 146px; height: 36px; padding: 0 9px; font-size: 8px; }
   .product-panel-card { min-height: 250px; padding: 22px 18px; }
   .product-card-icon { margin-bottom: 16px; }
   .product-card-divider { margin: 18px 0 12px; }
-  .take-button { min-width: 39px; width: 39px; padding: 0; }
+  .take-button { min-width: 32px; width: 32px; padding: 0; }
   .take-button span, .take-button kbd { display: none; }
-  .take-icon { width: 18px; height: 18px; }
-  .xr-button { width: 39px; max-width: 39px; padding: 0; }
+  .take-icon { width: 17px; height: 17px; }
+  .xr-button { width: 32px; max-width: 32px; padding: 0; }
   .xr-button span { display: none; }
-  .pause-button, .reset-view-button { width: 36px; }
-  .caption-title { max-width: 180px; font-size: 9px; }
+  .pause-button, .reset-view-button { width: 32px; }
+  .caption-title { max-width: 138px; font-size: 9px; }
   .route-markers { right: 13px; top: 46px; }
   .screen-overlay { padding: 52px 12px; }
   .intro-card, .pause-card, .finish-card { padding: 19px 16px 15px; }
@@ -397,12 +405,14 @@ h1 span { color: #9bc9a9; }
   .viewer-id strong { font-size: 7px; }
   .viewer-id small { font-size: 8px; }
   .viewer-live { font-size: 7px; }
-  .viewer-actions { gap: 3px; }
-  .begin-route-button { width: 138px; min-width: 138px; height: 34px; padding: 0 8px; font-size: 7px; }
-  .caption-title { max-width: 130px; }
-  .take-button, .xr-button, .pause-button, .reset-view-button { width: 34px; min-width: 34px; height: 34px; }
-  .take-button { min-width: 34px; }
-  .xr-button { max-width: 34px; }
+  .viewer-bottomline { gap: 4px; }
+  .viewer-caption { max-width: 112px; }
+  .viewer-actions { gap: 2px; }
+  .begin-route-button { width: 138px; min-width: 138px; height: 32px; padding: 0 8px; font-size: 7px; }
+  .caption-title { max-width: 112px; }
+  .take-button, .xr-button, .pause-button, .reset-view-button { width: 28px; min-width: 28px; height: 30px; }
+  .take-button { min-width: 28px; }
+  .xr-button { max-width: 28px; }
   .finish-stats { gap: 6px; }
   .page-footer { align-items: flex-start; flex-direction: column; gap: 7px; }
 }

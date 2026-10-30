@@ -76,6 +76,9 @@
                 <button class="pause-button" id="pause-button" type="button" disabled hidden aria-label="Pausar recorrido">
                   <svg viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M6.5 4.5v9M11.5 4.5v9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                 </button>
+                <button class="reset-view-button camera-center-button" id="recenter-camera" type="button" aria-label="Recentrar cámara (C)" title="Recentrar cámara (C)">
+                  <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="6.2" stroke="currentColor" stroke-width="1.35"/><circle cx="10" cy="10" r="1.4" fill="currentColor"/><path d="M10 1.7v2M10 16.3v2M1.7 10h2M16.3 10h2" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/></svg>
+                </button>
                 <button class="reset-view-button" id="reset-button" type="button" hidden aria-label="Reiniciar recorrido (R)" title="Reiniciar recorrido (R)">
                   <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3.3 8a6.8 6.8 0 1 1 .4 4.7M3.3 3.7V8h4.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
@@ -104,8 +107,8 @@
                   <div><b>03</b><span><strong>Esquiva y pisa luz</strong><small>Evita conos y completa cada zona brillante.</small></span></div>
                 </div>
                 <div class="control-keys">
-                  <div><span class="key-icon">⌨</span><span><strong>Computador</strong><small>WASD / flechas · E o botón para agarrar · Shift para correr · P pausa · R reinicia</small></span></div>
-                  <div><span class="key-icon quest-icon">◉</span><span><strong>Meta Quest</strong><small>Joystick izquierdo para desplazarte · L3 acelera · gatillo toma/suelta · grip izquierdo ajusta apoyo</small></span></div>
+                  <div><span class="key-icon">⌨</span><span><strong>Computador</strong><small>W/S avanza/retrocede · A/D lateral · ratón gira · C recentra · diagonales sin acelerar · Shift corre · E toma/suelta · P pausa · R reinicia</small></span></div>
+                  <div><span class="key-icon quest-icon">◉</span><span><strong>Meta Quest</strong><small>Joystick izquierdo: avanza, retrocede y muévete a los lados según hacia dónde miras · gira la cabeza naturalmente · L3 acelera · grip ajusta el apoyo · no hace falta caminar físicamente</small></span></div>
                 </div>
                 <button class="start-game-button" id="start-game" type="button">Entendido · preparar recorrido <span aria-hidden="true">→</span></button>
                 <p class="instruction-footnote">Después, toma el bastón con el gatillo en Quest o con E / el botón en computador.</p>
@@ -255,9 +258,9 @@
         </section>
 
         <section class="guide-strip" aria-label="Ayuda rápida y nota de seguridad">
-          <div class="guide-item"><span class="guide-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M3.5 10h13M10 3.5v13M5.4 5.4l9.2 9.2m0-9.2-9.2 9.2" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/></svg></span><span><strong>En computador</strong><small>WASD / flechas para moverte · Shift para correr · [ y ] para ajustar apoyo.</small></span></div>
+          <div class="guide-item"><span class="guide-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M3.5 10h13M10 3.5v13M5.4 5.4l9.2 9.2m0-9.2-9.2 9.2" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/></svg></span><span><strong>En computador</strong><small>W/S adelante/atrás · A/D lateral · ratón gira la cámara · C recentra · diagonales sin acelerar · Shift corre.</small></span></div>
           <div class="guide-divider" aria-hidden="true"></div>
-          <div class="guide-item guide-xr"><span class="guide-icon xr-guide-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M3.2 6.6h13.6c.8 0 1.4.6 1.4 1.4v4a1.5 1.5 0 0 1-2 1.4l-2.5-.9a6 6 0 0 0-4 0l-2.5.9a1.5 1.5 0 0 1-2-1.4V8c0-.8.6-1.4 1.4-1.4Z" stroke="currentColor" stroke-width="1.3"/><path d="M6 8.5v3M4.5 10h3M13 9.5h.01M15.4 10.7h.01" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/></svg></span><span><strong>En Meta Quest</strong><small id="xr-guide-text">Joystick izquierdo para moverte · L3 acelera · gatillo sujeta · grip izquierdo ajusta apoyo.</small></span></div>
+          <div class="guide-item guide-xr"><span class="guide-icon xr-guide-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M3.2 6.6h13.6c.8 0 1.4.6 1.4 1.4v4a1.5 1.5 0 0 1-2 1.4l-2.5-.9a6 6 0 0 0-4 0l-2.5.9a1.5 1.5 0 0 1-2-1.4V8c0-.8.6-1.4 1.4-1.4Z" stroke="currentColor" stroke-width="1.3"/><path d="M6 8.5v3M4.5 10h3M13 9.5h.01M15.4 10.7h.01" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/></svg></span><span><strong>En Meta Quest</strong><small id="xr-guide-text">Joystick izquierdo mueve según la dirección horizontal del visor; gira la cabeza con naturalidad. L3 acelera; grip ajusta apoyo.</small></span></div>
           <div class="guide-disclaimer"><span class="disclaimer-mark">i</span><span>Apoyo, latidos, respiración y estamina <b>son simulados</b>.</span></div>
         </section>
 
