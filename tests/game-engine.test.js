@@ -129,6 +129,18 @@ test('movement supports forward, reverse, and lateral corrections while holding 
   assert.ok(state.player.x < rightStrafePosition.x, 'left strafe corrects laterally');
 });
 
+test('holding reverse at the route start cannot move the player outside the course', () => {
+  const state = createGameState({ showInstructions: false });
+  grabCane(state);
+
+  tick(state, { forward: -1 }, 60);
+
+  assert.equal(state.player.z, GAME_ROUTE.startZ);
+  assert.ok(state.player.z <= GAME_ROUTE.startZ);
+  assert.equal(state.player.x, 0);
+  assert.equal(state.phase, 'playing');
+});
+
 test('diagonal input has the same total travel speed as straight input', () => {
   const straight = createGameState({ showInstructions: false });
   const diagonal = createGameState({ showInstructions: false });

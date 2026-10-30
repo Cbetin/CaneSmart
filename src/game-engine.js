@@ -239,7 +239,7 @@ export function stepGame(state, input = {}, deltaSeconds = 1 / 60) {
   if (speed > 0) {
     const divisor = Math.max(inputMagnitude, 0.001);
     const nextX = clamp(state.player.x + (moveX / divisor) * speed * dt, GAME_ROUTE.minX, GAME_ROUTE.maxX);
-    const nextZ = state.player.z - (forward / divisor) * speed * dt;
+    const nextZ = Math.min(GAME_ROUTE.startZ, state.player.z - (forward / divisor) * speed * dt);
     state.player.x = nextX;
     state.player.z = nextZ;
   }
